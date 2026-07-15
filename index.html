@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FAP Grade Calculator — FPT University</title>
+  <meta name="description" content="Userscript & console MVP: nhập điểm Value trên FAP, tính Average theo weight, resit, GPA kỳ. Client-side only." />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #070b14;
+      --bg2: #0f172a;
+      --card: #111827;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent2: #4ade80;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --code-bg: #020617;
+      --radius: 14px;
+      --shadow: 0 20px 50px rgba(0,0,0,.45);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(56,189,248,.12), transparent 55%),
+        radial-gradient(900px 500px at 90% 0%, rgba(74,222,128,.08), transparent 50%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { width: min(1080px, calc(100% - 32px)); margin: 0 auto; }
+    header {
+      padding: 28px 0 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      font-size: 1.05rem;
+    }
+    .logo {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, #0ea5e9, #22c55e);
+      display: grid; place-items: center;
+      font-weight: 800; color: #041016; font-size: 14px;
+    }
+    nav { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.92rem;
+      cursor: pointer;
+      text-decoration: none !important;
+      transition: .15s ease;
+    }
+    .btn:hover { border-color: #334155; background: #1e293b; }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #16a34a);
+      border-color: transparent;
+      color: #fff;
+    }
+    .btn-primary:hover { filter: brightness(1.08); background: linear-gradient(135deg, #0284c7, #16a34a); }
+    .btn-ghost { background: transparent; }
+    .hero { padding: 48px 0 28px; }
+    .hero h1 {
+      margin: 0 0 14px;
+      font-size: clamp(2rem, 4.5vw, 3rem);
+      line-height: 1.12;
+      letter-spacing: -0.03em;
+      font-weight: 800;
+    }
+    .hero h1 span {
+      background: linear-gradient(90deg, #38bdf8, #4ade80);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .lead { color: var(--muted); font-size: 1.08rem; max-width: 62ch; margin: 0 0 22px; }
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+    .badge {
+      font-size: 0.78rem; font-weight: 600;
+      padding: 5px 10px; border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(15,23,42,.7);
+      color: var(--muted);
+    }
+    .badge strong { color: var(--accent2); font-weight: 700; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 28px 0 8px;
+    }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: linear-gradient(180deg, rgba(30,41,59,.55), rgba(17,24,39,.9));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 18px 16px;
+      box-shadow: var(--shadow);
+    }
+    .card h3 { margin: 0 0 8px; font-size: 1rem; }
+    .card p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+    .icon { font-size: 1.35rem; margin-bottom: 10px; }
+    section { padding: 28px 0; }
+    section h2 {
+      margin: 0 0 8px;
+      font-size: 1.45rem;
+      letter-spacing: -0.02em;
+    }
+    .section-lead { color: var(--muted); margin: 0 0 16px; }
+    .tabs {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .tab {
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+    .tab.active {
+      color: #041016;
+      background: linear-gradient(135deg, #38bdf8, #4ade80);
+      border-color: transparent;
+    }
+    .code-shell {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--code-bg);
+      box-shadow: var(--shadow);
+    }
+    .code-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; flex-wrap: wrap;
+      padding: 10px 12px;
+      background: #0b1220;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .code-bar strong { color: var(--text); font-weight: 600; }
+    pre {
+      margin: 0;
+      padding: 16px;
+      max-height: min(520px, 60vh);
+      overflow: auto;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: #cbd5e1;
+    }
+    pre .muted { color: #64748b; }
+    .warn-box {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(251,191,36,.35);
+      background: rgba(251,191,36,.08);
+      color: #fde68a;
+      font-size: 0.9rem;
+    }
+    ol.steps { margin: 0; padding-left: 1.2rem; color: var(--muted); }
+    ol.steps li { margin: 8px 0; }
+    ol.steps strong { color: var(--text); }
+    footer {
+      padding: 36px 0 48px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      border-top: 1px solid var(--border);
+      margin-top: 20px;
+    }
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: #14532d; color: #bbf7d0; border: 1px solid #22c55e;
+      padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 0.9rem;
+      opacity: 0; pointer-events: none; transition: .2s ease; z-index: 99;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .formula {
+      font-family: "IBM Plex Mono", monospace;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #a5f3fc;
+      font-size: 0.92rem;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">FG</div>
+        <div>FAP Grade Calculator</div>
+      </div>
+      <nav>
+        <a class="btn btn-ghost" href="https://github.com/Vlantoy/fap-grade-calculator" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn btn-primary" id="btn-install" href="scripts/fap-grade-calculator.user.js">Cài Tampermonkey</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="badges">
+        <span class="badge"><strong>FPT University</strong> · FAP</span>
+        <span class="badge">Client-side only</span>
+        <span class="badge">MIT License</span>
+        <span class="badge">v10</span>
+      </div>
+      <h1>Tính điểm thành phần &amp; <span>GPA kỳ</span> trên FAP</h1>
+      <p class="lead">
+        Userscript cho trình duyệt: gõ thử điểm vào cột <strong>Value</strong> trên
+        <code>StudentGrade.aspx</code>, tự tính <strong>Average</strong> theo trọng số,
+        xử lý <strong>Resit</strong>, và gom TB các môn trong session thành GPA.
+        Không gửi dữ liệu ra ngoài — chỉ chạy trên máy bạn.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a class="btn btn-primary" href="#install">Bắt đầu cài đặt</a>
+        <a class="btn" href="#console-mvp">Console MVP (1 môn)</a>
+        <a class="btn" href="#script">Xem source script</a>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="card">
+        <div class="icon">✏️</div>
+        <h3>Nhập Value trên bảng FAP</h3>
+        <p>Ô trống thành input. Điểm đã có trên FAP được giữ. Reload trang chi tiết có thể khôi phục từ session tab.</p>
+      </div>
+      <div class="card">
+        <div class="icon">⚖️</div>
+        <h3>Weight + Resit</h3>
+        <p>Average = Σ(value × weight / 100). Có điểm thi lại → bỏ lần 1 cùng loại (Practical / Theory…).</p>
+      </div>
+      <div class="card">
+        <div class="icon">📊</div>
+        <h3>GPA kỳ (session)</h3>
+        <p>Lưu TB từng môn trong tab → trang tổng quát hiện TB hệ 10 và GPA thang 4.0. Đóng tab = mất.</p>
+      </div>
+    </div>
+
+    <section id="install">
+      <h2>Cài đặt Tampermonkey</h2>
+      <p class="section-lead">Bản đầy đủ: 1 môn + resit + GPA kỳ.</p>
+      <div class="card" style="margin-bottom:14px">
+        <ol class="steps">
+          <li>Cài <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener"><strong>Tampermonkey</strong></a> (Chrome / Edge / Firefox).</li>
+          <li><strong>Tắt</strong> script kiểu “FAP Grade Watcher” (overlay đỏ + chuông) nếu đang bật — dễ đụng độ.</li>
+          <li>Bấm <a href="scripts/fap-grade-calculator.user.js"><strong>Cài script</strong></a> (hoặc raw GitHub) → Tampermonkey hỏi cài → Install.</li>
+          <li>Mở <a href="https://fap.fpt.edu.vn/Grade/StudentGrade.aspx" target="_blank" rel="noopener">FAP Mark Report</a> → chọn môn → gõ Value.</li>
+        </ol>
+      </div>
+      <div class="warn-box">
+        ⚠️ Chỉ dùng để <strong>ước lượng / what-if</strong>. Điểm chính thức vẫn do nhà trường ghi trên FAP.
+        Không share cookie / session FAP.
+      </div>
+    </section>
+
+    <section id="console-mvp">
+      <h2>Console MVP — chỉ 1 môn</h2>
+      <p class="section-lead">
+        Không cần cài extension. Mở trang điểm <strong>một môn</strong>, F12 → Console → dán script → Enter.
+      </p>
+      <div class="code-shell" style="margin-bottom:12px">
+        <div class="code-bar">
+          <span><strong>scripts/fap-grade-mvp-console.js</strong> · one-shot</span>
+          <button type="button" class="btn" data-copy="mvp">Copy MVP</button>
+        </div>
+        <pre id="pre-mvp" class="muted">Đang tải script…</pre>
+      </div>
+      <p class="section-lead" style="margin:0">Hoặc tải lệnh gọn (fetch rồi eval — cần online):</p>
+      <div class="code-shell" style="margin-top:10px">
+        <div class="code-bar">
+          <span><strong>One-liner</strong> (GitHub Pages)</span>
+          <button type="button" class="btn" data-copy="oneliner">Copy one-liner</button>
+        </div>
+        <pre id="pre-oneliner"></pre>
+      </div>
+    </section>
+
+    <section id="formula">
+      <h2>Công thức</h2>
+      <div class="formula">Average = Σ (value<sub>i</sub> × weight<sub>i</sub> / 100)</div>
+      <p class="section-lead" style="margin-top:12px">
+        Resit có điểm → dùng resit, không cộng lần 1 cùng base name.
+        GPA kỳ: trung bình cộng TB các môn đã lưu; GPA 4.0 quy đổi thang FPT (A+→4.0 … D→1.0).
+      </p>
+    </section>
+
+    <section id="script">
+      <h2>Source trên trang chủ</h2>
+      <p class="section-lead">Xem / copy trực tiếp userscript đầy đủ và bản MVP.</p>
+      <div class="tabs">
+        <button type="button" class="tab active" data-tab="full">Userscript đầy đủ</button>
+        <button type="button" class="tab" data-tab="mvp">Console MVP</button>
+      </div>
+      <div class="code-shell" data-pane="full">
+        <div class="code-bar">
+          <span><strong>fap-grade-calculator.user.js</strong></span>
+          <div style="display:flex;gap:8px">
+            <a class="btn" href="scripts/fap-grade-calculator.user.js" target="_blank" rel="noopener">Raw</a>
+            <button type="button" class="btn" data-copy="full">Copy all</button>
+          </div>
+        </div>
+        <pre id="pre-full" class="muted">Đang tải…</pre>
+      </div>
+      <div class="code-shell" data-pane="mvp" hidden>
+        <div class="code-bar">
+          <span><strong>fap-grade-mvp-console.js</strong></span>
+          <div style="display:flex;gap:8px">
+            <a class="btn" href="scripts/fap-grade-mvp-console.js" target="_blank" rel="noopener">Raw</a>
+            <button type="button" class="btn" data-copy="mvp">Copy all</button>
+          </div>
+        </div>
+        <pre id="pre-mvp-2" class="muted">Đang tải…</pre>
+      </div>
+    </section>
+
+    <footer>
+      <div>MIT © <a href="https://github.com/Vlantoy">Vlantoy</a> ·
+        <a href="https://github.com/Vlantoy/fap-grade-calculator">Repository</a> ·
+        Không liên kết chính thức với FPT University.
+      </div>
+      <div style="margin-top:6px">Deploy: GitHub Pages · Source of truth trên <code>main</code>.</div>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast">Đã copy</div>
+
+  <script>
+    (function () {
+      var FULL_URL = 'scripts/fap-grade-calculator.user.js';
+      var MVP_URL = 'scripts/fap-grade-mvp-console.js';
+      // One-liner trỏ raw GitHub (ổn định hơn path tương đối khi dán trên fap.fpt.edu.vn)
+      var RAW_MVP =
+        'https://raw.githubusercontent.com/Vlantoy/fap-grade-calculator/main/scripts/fap-grade-mvp-console.js';
+
+      var cache = { full: '', mvp: '' };
+
+      function toast(msg) {
+        var t = document.getElementById('toast');
+        t.textContent = msg || 'Đã copy';
+        t.classList.add('show');
+        setTimeout(function () { t.classList.remove('show'); }, 1600);
+      }
+
+      function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(text).then(function () { toast('Đã copy vào clipboard'); });
+        }
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        toast('Đã copy vào clipboard');
+        return Promise.resolve();
+      }
+
+      function load(url, keys) {
+        return fetch(url, { cache: 'no-cache' })
+          .then(function (r) {
+            if (!r.ok) throw new Error(r.status);
+            return r.text();
+          })
+          .then(function (txt) {
+            keys.forEach(function (id) {
+              var el = document.getElementById(id);
+              if (el) {
+                el.textContent = txt;
+                el.classList.remove('muted');
+              }
+            });
+            return txt;
+          })
+          .catch(function () {
+            keys.forEach(function (id) {
+              var el = document.getElementById(id);
+              if (el) el.textContent = 'Không tải được ' + url + ' — mở file Raw trực tiếp.';
+            });
+            return '';
+          });
+      }
+
+      var oneliner =
+        "fetch('" + RAW_MVP + "').then(r=>r.text()).then(eval);\n" +
+        "// hoặc: copy full MVP từ trang này rồi dán Console";
+
+      document.getElementById('pre-oneliner').textContent = oneliner;
+
+      Promise.all([
+        load(FULL_URL, ['pre-full']).then(function (t) { cache.full = t; }),
+        load(MVP_URL, ['pre-mvp', 'pre-mvp-2']).then(function (t) { cache.mvp = t; }),
+      ]);
+
+      document.querySelectorAll('.tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+          tab.classList.add('active');
+          var name = tab.getAttribute('data-tab');
+          document.querySelectorAll('[data-pane]').forEach(function (p) {
+            p.hidden = p.getAttribute('data-pane') !== name;
+          });
+        });
+      });
+
+      document.querySelectorAll('[data-copy]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var kind = btn.getAttribute('data-copy');
+          if (kind === 'full') copyText(cache.full || document.getElementById('pre-full').textContent);
+          else if (kind === 'mvp') copyText(cache.mvp || document.getElementById('pre-mvp').textContent);
+          else if (kind === 'oneliner') copyText(oneliner);
+        });
+      });
+
+      // Tampermonkey install: prefer raw github for @require install
+      var install = document.getElementById('btn-install');
+      install.href =
+        'https://raw.githubusercontent.com/Vlantoy/fap-grade-calculator/main/scripts/fap-grade-calculator.user.js';
+    })();
+  </script>
+</body>
+</html>
