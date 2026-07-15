@@ -26,14 +26,17 @@ https://vlantoy.github.io/fap-grade-calculator/what-if.html
 
 ## Features
 
-| Feature | Userscript (full) | Console MVP |
-|--------|-------------------|-------------|
-| Editable **Value** cells on `StudentGrade` | Yes | Yes |
-| Weighted average → **Average** row | Yes | Yes |
-| **Resit** replaces 1st attempt of same component | Yes | Yes |
-| Session store + **term GPA** panel | Yes | No |
-| **Auto-reset** after idle TTL (default **3 min**) | Yes | Yes |
-| No install (paste in DevTools) | — | Yes |
+| Feature | What-if web | Userscript (full) | Console MVP |
+|--------|-------------|-------------------|-------------|
+| Zero install (open link) | **Yes** | No (Tampermonkey) | Paste in DevTools |
+| Mark Details–style table | **Yes** | On FAP page | On FAP page |
+| Mobile **0–9 wheel** picker | **Yes** | Browser keyboard | Browser keyboard |
+| “Need FE score for target avg?” | **Yes** | No | No |
+| Editable **Value** on `StudentGrade` | No | Yes | Yes |
+| Weighted average → **Average** | Yes | Yes | Yes |
+| **Resit** replaces 1st attempt | Yes | Yes | Yes |
+| Session / term GPA panel | local only | Session tab | No |
+| **Auto-reset** after idle TTL | No (saved locally) | **3 min** idle | **3 min** idle |
 
 After the TTL (or closing the GPA panel with **×**), inputs are removed, Average/original cells are restored, and session data is cleared — as if the tool never ran. Typing again extends the TTL.
 
@@ -51,7 +54,15 @@ Average = Σ (valueᵢ × weightᵢ / 100)
 
 ## Quick start
 
-### A. Tampermonkey (recommended)
+### A. What-if web (no install)
+
+1. Open https://vlantoy.github.io/fap-grade-calculator/what-if.html  
+2. Load the default My FAP–style template (or edit rows).  
+3. Tap **Value** → spin integer / decimal wheels (0–9, 10.0 allowed) → **Xong**.  
+4. Read **Average**, letter, and “Cần điểm FE bao nhiêu?”.  
+5. Data stays in `localStorage` on your device only.
+
+### B. Tampermonkey (on FAP page)
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/).
 2. **Disable** other FAP scripts that full-screen alert on grade changes (e.g. “FAP Grade Watcher”) while testing.
@@ -61,7 +72,7 @@ Average = Σ (valueᵢ × weightᵢ / 100)
      [`scripts/fap-grade-calculator.user.js`](https://raw.githubusercontent.com/Vlantoy/fap-grade-calculator/main/scripts/fap-grade-calculator.user.js)
 4. Open [Mark Report](https://fap.fpt.edu.vn/Grade/StudentGrade.aspx) → pick a course → type values.
 
-### B. Console MVP (one course, no extension)
+### C. Console MVP (one course, no extension)
 
 1. Open a **single course** grade page (`StudentGrade.aspx?...&course=...`).
 2. DevTools → **Console**.

@@ -260,6 +260,7 @@
       </div>
       <nav>
         <a class="btn btn-ghost" href="https://github.com/Vlantoy/fap-grade-calculator" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn" href="what-if.html">What-if (0 cài)</a>
         <a class="btn btn-primary" id="btn-install" href="scripts/fap-grade-calculator.user.js">Cài Tampermonkey</a>
       </nav>
     </header>
@@ -312,21 +313,34 @@
 
     <div class="grid">
       <div class="card">
-        <div class="icon">✏️</div>
-        <h3>Nhập Value trên bảng FAP</h3>
-        <p>Ô trống thành input. Điểm đã có trên FAP được giữ. Reload trang chi tiết có thể khôi phục từ session tab.</p>
+        <div class="icon">📱</div>
+        <h3><a href="what-if.html">What-if zero-install</a></h3>
+        <p>Trang Mark Details riêng: bánh xe 0–9 trên mobile, Average live, resit, “cần FE bao nhiêu?”. Không extension.</p>
       </div>
       <div class="card">
-        <div class="icon">⚖️</div>
-        <h3>Weight + Resit</h3>
-        <p>Average = Σ(value × weight / 100). Có điểm thi lại → bỏ lần 1 cùng loại (Practical / Theory…).</p>
+        <div class="icon">✏️</div>
+        <h3>Nhập Value trên bảng FAP</h3>
+        <p>Userscript: ô trống thành input trên FAP. Average = Σ(value × weight / 100). Resit thay lần 1.</p>
       </div>
       <div class="card">
         <div class="icon">📊</div>
         <h3>GPA kỳ (session)</h3>
-        <p>Lưu TB tạm trong tab → GPA kỳ. <strong>Tự xóa sau 3 phút</strong> (gia hạn khi gõ) — về như chưa tính.</p>
+        <p>Script lưu TB tạm trong tab → GPA kỳ. <strong>Tự xóa sau 3 phút</strong> idle — về như chưa tính.</p>
       </div>
     </div>
+
+    <section id="what-if" style="padding-top:8px">
+      <h2>What-if Mark Details</h2>
+      <p class="section-lead">
+        Dành cho ai <strong>không muốn cài</strong> Tampermonkey: mở link → gõ weight/điểm (hoặc xoay bánh xe trên điện thoại) → Average + letter + điểm FE cần đạt.
+      </p>
+      <div class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+        <div style="color:var(--muted);font-size:0.95rem;max-width:52ch">
+          UI kiểu My FAP Mark Details · lưu localStorage · client-side only.
+        </div>
+        <a class="btn btn-primary" href="what-if.html">Mở What-if →</a>
+      </div>
+    </section>
 
     <section id="what-if-section">
       <h2>Không cài gì — What-if trên điện thoại</h2>
