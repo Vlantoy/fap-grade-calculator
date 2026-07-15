@@ -3,15 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <title>What-if Mark Details — FAP Grade Calculator</title>
-  <meta name="description" content="Tính điểm what-if kiểu Mark Details My FAP. Zero install. Wheel 0–9 trên mobile. Client-side only." />
+  <title>OCR Mark Details — FAP What-if</title>
+  <meta name="description" content="Chụp / upload ảnh Mark Details My FAP → OCR tự nhận thẻ điểm → sửa bằng bánh xe → Average." />
   <meta name="theme-color" content="#0b1f3a" />
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="assets/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="assets/favicon-32.png" />
-  <meta property="og:title" content="What-if Mark Details — FAP Grade Calculator" />
-  <meta property="og:description" content="Nhập weight + điểm, Average live, resit, wheel picker mobile. Không cần cài extension." />
-  <meta property="og:image" content="https://vlantoy.github.io/fap-grade-calculator/assets/demo-screenshot.png" />
   <style>
     :root {
       --navy: #0b1f3a;
@@ -27,7 +24,6 @@
       --green: #16a34a;
       --accent: #2563eb;
       --danger: #dc2626;
-      --sheet: #ffffff;
       --wheel-h: 168px;
       --item-h: 42px;
       --safe-b: env(safe-area-inset-bottom, 0px);
@@ -35,582 +31,387 @@
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100dvh;
-      line-height: 1.35;
+      line-height: 1.4;
       -webkit-tap-highlight-color: transparent;
     }
     a { color: var(--accent); text-decoration: none; }
 
-    /* ===== App chrome (My FAP-like) ===== */
     .app-bar {
       position: sticky; top: 0; z-index: 40;
-      background: var(--navy);
-      color: #fff;
+      background: var(--navy); color: #fff;
       display: flex; align-items: center; gap: 8px;
-      padding: 12px 12px;
-      min-height: 52px;
+      padding: 12px; min-height: 52px;
       box-shadow: 0 2px 10px rgba(0,0,0,.18);
     }
     .app-bar .back {
-      display: inline-flex; align-items: center; justify-content: center;
       width: 36px; height: 36px; border-radius: 10px;
-      color: #fff; background: transparent; border: 0; cursor: pointer;
-      font-size: 1.25rem; text-decoration: none;
+      display: grid; place-items: center; color: #fff; font-size: 1.25rem;
     }
-    .app-bar .back:hover { background: rgba(255,255,255,.1); }
     .app-bar h1 {
       flex: 1; margin: 0; text-align: center;
-      font-size: 1.05rem; font-weight: 600; letter-spacing: .01em;
-      padding-right: 36px; /* balance back btn */
+      font-size: 1.05rem; font-weight: 600; padding-right: 36px;
     }
-    .app-bar .menu {
-      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-      display: flex; gap: 6px;
-    }
-    .icon-btn {
-      border: 0; background: rgba(255,255,255,.1); color: #fff;
-      width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
-      font-size: 0.95rem; display: inline-flex; align-items: center; justify-content: center;
-    }
-    .icon-btn:hover { background: rgba(255,255,255,.18); }
 
     .page {
       width: min(720px, 100%);
       margin: 0 auto;
-      padding: 14px 12px calc(28px + var(--safe-b));
+      padding: 14px 12px calc(24px + var(--safe-b));
     }
 
     .hint {
-      font-size: 0.82rem; color: var(--muted);
-      margin: 0 0 12px; padding: 0 4px;
+      font-size: 0.84rem; color: var(--muted);
+      margin: 0 0 12px; padding: 0 2px;
     }
     .hint strong { color: var(--text); }
 
-    /* Course name */
-    .course-bar {
-      display: flex; gap: 8px; align-items: center;
-      margin-bottom: 10px;
-    }
-    .course-bar input {
-      flex: 1; min-width: 0;
-      border: 1px solid var(--border);
+    /* ===== OCR dropzone (PRIMARY) ===== */
+    .ocr-card {
       background: var(--card);
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: var(--text);
-      outline: none;
-    }
-    .course-bar input:focus { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
-
-    /* Mark Details card */
-    .mark-card {
-      background: var(--card);
+      border: 2px dashed #94a3b8;
       border-radius: 16px;
-      box-shadow: 0 8px 28px rgba(15, 39, 68, .08);
-      overflow: hidden;
-      border: 1px solid #e6ebf2;
-    }
-    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-    table.marks {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 520px;
-      font-size: 0.88rem;
-    }
-    table.marks thead th {
-      background: var(--header);
-      color: #fff;
-      font-weight: 600;
-      text-align: left;
-      padding: 11px 10px;
-      white-space: nowrap;
-      font-size: 0.84rem;
-    }
-    table.marks thead th:first-child { padding-left: 14px; }
-    table.marks thead th:last-child { padding-right: 14px; text-align: right; }
-    table.marks tbody td {
-      padding: 10px 10px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
-      background: var(--card);
-    }
-    table.marks tbody tr:nth-child(even) td { background: var(--row-alt); }
-    table.marks tbody tr.is-total td {
-      color: var(--muted);
-      font-style: italic;
-    }
-    table.marks tbody tr.is-avg td {
-      background: #f0f6ff !important;
-      font-weight: 700;
-      border-bottom: 1px solid var(--border);
-    }
-    table.marks tbody tr.is-status td {
-      background: #f8fafc !important;
-      border-bottom: none;
-    }
-    table.marks td.cat {
-      font-weight: 500;
-      color: var(--text);
-      max-width: 120px;
-    }
-    table.marks td.item { color: var(--text); max-width: 130px; }
-    table.marks td.weight {
-      white-space: nowrap;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-    }
-    table.marks td.value {
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      font-weight: 600;
-      color: var(--value);
-      min-width: 72px;
-    }
-    table.marks td.actions {
-      width: 36px; padding: 4px;
+      padding: 18px 14px;
       text-align: center;
+      box-shadow: 0 8px 28px rgba(15,39,68,.06);
+      transition: border-color .15s, background .15s;
     }
-    .val-btn {
-      appearance: none; border: 0;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      cursor: pointer;
-      padding: 6px 8px;
-      border-radius: 8px;
-      min-width: 48px;
-      text-align: right;
-    }
-    .val-btn:hover, .val-btn:focus {
-      background: rgba(37,99,235,.1);
-      outline: none;
-    }
-    .val-btn.empty { color: #94a3b8; font-weight: 500; }
-    .val-btn.readonly {
-      cursor: default; font-weight: 700;
-    }
-    .val-btn.readonly:hover { background: transparent; }
-    .status-ok { color: var(--green); font-weight: 600; }
-    .status-fail { color: var(--danger); font-weight: 600; }
-    .status-study { color: var(--green); font-weight: 600; }
-
-    .row-edit {
-      width: 100%;
-      border: 1px dashed transparent;
-      background: transparent;
-      font: inherit;
-      color: inherit;
-      padding: 4px 2px;
-      border-radius: 6px;
-      outline: none;
-    }
-    .row-edit:hover { border-color: #cbd5e1; background: #fff; }
-    .row-edit:focus { border-color: #93c5fd; background: #fff; box-shadow: 0 0 0 2px rgba(37,99,235,.12); }
-    .row-edit.w-sm { width: 64px; text-align: right; }
-    .row-edit.muted { color: var(--muted); }
-
-    .del-btn {
-      border: 0; background: transparent; color: #cbd5e1;
-      cursor: pointer; font-size: 1rem; padding: 4px 6px; border-radius: 6px;
-      line-height: 1;
-    }
-    .del-btn:hover { color: var(--danger); background: #fef2f2; }
-
-    /* Toolbar under table */
-    .tools {
-      display: flex; flex-wrap: wrap; gap: 8px;
-      padding: 12px;
-      border-top: 1px solid var(--border);
-      background: #fafbfd;
+    .ocr-card.drag { border-color: var(--accent); background: #eff6ff; }
+    .ocr-card.has-table { border-style: solid; border-color: #e6ebf2; padding: 12px; }
+    .ocr-title { font-weight: 800; font-size: 1.05rem; margin: 0 0 6px; }
+    .ocr-sub { font-size: 0.85rem; color: var(--muted); margin: 0 0 14px; }
+    .ocr-actions {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
     }
     .btn {
-      appearance: none;
-      border: 1px solid var(--border);
-      background: #fff;
-      color: var(--text);
-      border-radius: 10px;
-      padding: 9px 12px;
-      font-size: 0.86rem;
-      font-weight: 600;
-      cursor: pointer;
+      appearance: none; border: 1px solid var(--border);
+      background: #fff; color: var(--text);
+      border-radius: 12px; padding: 12px 14px;
+      font-size: 0.9rem; font-weight: 700; cursor: pointer;
       display: inline-flex; align-items: center; gap: 6px;
     }
     .btn:hover { background: #f1f5f9; }
     .btn-primary {
-      background: var(--navy);
-      border-color: var(--navy);
-      color: #fff;
+      background: var(--navy); border-color: var(--navy); color: #fff;
     }
     .btn-primary:hover { background: var(--navy2); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
     .btn-ghost { background: transparent; }
 
-    /* Result strip */
+    .preview-wrap {
+      margin-top: 12px; display: none;
+    }
+    .preview-wrap.show { display: block; }
+    .preview-wrap img {
+      max-width: 100%; max-height: 180px;
+      border-radius: 10px; border: 1px solid var(--border);
+      object-fit: contain; background: #f8fafc;
+    }
+
+    .ocr-status {
+      margin-top: 12px;
+      font-size: 0.86rem;
+      color: var(--muted);
+      min-height: 1.3em;
+    }
+    .ocr-status.err { color: var(--danger); font-weight: 600; }
+    .ocr-status.ok { color: var(--green); font-weight: 600; }
+    .progress {
+      margin-top: 10px; height: 6px; border-radius: 999px;
+      background: #e2e8f0; overflow: hidden; display: none;
+    }
+    .progress.show { display: block; }
+    .progress > i {
+      display: block; height: 100%; width: 0%;
+      background: linear-gradient(90deg, #0284c7, #22c55e);
+      transition: width .2s;
+    }
+
+    .raw-toggle {
+      margin-top: 8px; font-size: 0.8rem; color: var(--accent);
+      background: none; border: 0; cursor: pointer; font-weight: 600;
+      display: none;
+    }
+    .raw-toggle.show { display: inline; }
+    .raw-box {
+      display: none; margin-top: 8px; text-align: left;
+      background: #0f172a; color: #cbd5e1;
+      font: 11px/1.4 ui-monospace, monospace;
+      padding: 10px; border-radius: 10px;
+      max-height: 160px; overflow: auto; white-space: pre-wrap;
+    }
+    .raw-box.show { display: block; }
+
+    /* Table after OCR */
+    .table-section { display: none; margin-top: 14px; }
+    .table-section.show { display: block; }
+
+    .course-bar { margin-bottom: 10px; }
+    .course-bar input {
+      width: 100%; border: 1px solid var(--border);
+      background: var(--card); border-radius: 12px;
+      padding: 10px 12px; font-size: 0.95rem; font-weight: 600;
+    }
+
+    .mark-card {
+      background: var(--card);
+      border-radius: 16px;
+      box-shadow: 0 8px 28px rgba(15,39,68,.08);
+      overflow: hidden; border: 1px solid #e6ebf2;
+    }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table.marks {
+      width: 100%; border-collapse: collapse;
+      min-width: 480px; font-size: 0.88rem;
+    }
+    table.marks thead th {
+      background: var(--header); color: #fff;
+      font-weight: 600; text-align: left;
+      padding: 11px 10px; white-space: nowrap; font-size: 0.84rem;
+    }
+    table.marks tbody td {
+      padding: 10px; border-bottom: 1px solid var(--border);
+      vertical-align: middle; background: var(--card);
+    }
+    table.marks tbody tr:nth-child(even) td { background: var(--row-alt); }
+    table.marks tr.is-total td { color: var(--muted); font-style: italic; }
+    table.marks tr.is-avg td {
+      background: #f0f6ff !important; font-weight: 700;
+    }
+    table.marks td.weight {
+      white-space: nowrap; color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    table.marks td.value {
+      text-align: right; font-weight: 700;
+      font-variant-numeric: tabular-nums; min-width: 72px;
+    }
+    .val-btn {
+      appearance: none; border: 0; background: transparent;
+      color: inherit; font: inherit; font-weight: 700;
+      cursor: pointer; padding: 6px 8px; border-radius: 8px;
+      min-width: 48px; text-align: right;
+    }
+    .val-btn.empty { color: #94a3b8; font-weight: 500; }
+    .val-btn:hover { background: rgba(37,99,235,.1); }
+    .tools {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      padding: 12px; border-top: 1px solid var(--border); background: #fafbfd;
+    }
+
     .result {
       margin-top: 12px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
     }
     @media (max-width: 480px) { .result { grid-template-columns: 1fr; } }
     .result .box {
-      background: var(--card);
-      border: 1px solid #e6ebf2;
-      border-radius: 14px;
-      padding: 14px 16px;
-      box-shadow: 0 4px 16px rgba(15,39,68,.05);
+      background: var(--card); border: 1px solid #e6ebf2;
+      border-radius: 14px; padding: 14px 16px;
     }
-    .result .label { font-size: 0.78rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .result .label {
+      font-size: 0.75rem; color: var(--muted); font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
     .result .big {
       font-size: 1.85rem; font-weight: 800; margin-top: 4px;
-      font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
     }
-    .result .sub { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
     .letter {
-      display: inline-block;
-      background: #eff6ff; color: #1d4ed8;
-      padding: 2px 8px; border-radius: 999px;
-      font-weight: 700; font-size: 0.9rem;
+      display: inline-block; background: #eff6ff; color: #1d4ed8;
+      padding: 2px 8px; border-radius: 999px; font-weight: 700; font-size: 0.9rem;
     }
-
-    /* Reverse FE panel */
-    .need-fe {
-      margin-top: 12px;
-      background: var(--card);
-      border: 1px solid #e6ebf2;
-      border-radius: 14px;
-      padding: 14px 16px;
-      box-shadow: 0 4px 16px rgba(15,39,68,.05);
-    }
-    .need-fe h3 { margin: 0 0 8px; font-size: 0.95rem; }
-    .need-fe .row {
-      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-    }
-    .need-fe label { font-size: 0.85rem; color: var(--muted); }
-    .need-fe input, .need-fe select {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 10px;
-      font-size: 0.92rem;
-      outline: none;
-      background: #fff;
-    }
-    .need-fe input:focus, .need-fe select:focus {
-      border-color: #93c5fd;
-      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
-    }
-    .need-fe .answer {
-      margin-top: 10px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      min-height: 1.4em;
-    }
-    .need-fe .answer.ok { color: var(--green); }
-    .need-fe .answer.bad { color: var(--danger); }
 
     .footer-note {
-      margin-top: 18px;
-      font-size: 0.8rem;
-      color: var(--muted);
-      text-align: center;
-      padding: 0 8px 8px;
+      margin-top: 16px; font-size: 0.78rem; color: var(--muted); text-align: center;
     }
 
-    /* ===== Bottom sheet + wheels ===== */
+    /* Wheel sheet */
     .overlay {
-      position: fixed; inset: 0; z-index: 80;
-      background: rgba(8, 16, 32, .45);
-      opacity: 0; pointer-events: none;
-      transition: opacity .2s ease;
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(15,23,42,.45);
+      opacity: 0; pointer-events: none; transition: opacity .2s;
     }
     .overlay.open { opacity: 1; pointer-events: auto; }
-
     .sheet {
-      position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
-      background: var(--sheet);
-      border-radius: 18px 18px 0 0;
-      box-shadow: 0 -12px 40px rgba(0,0,0,.22);
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 110;
+      background: #fff; border-radius: 18px 18px 0 0;
       transform: translateY(110%);
       transition: transform .28s cubic-bezier(.2,.8,.2,1);
-      padding: 0 0 calc(12px + var(--safe-b));
-      max-height: min(78dvh, 520px);
-      display: flex; flex-direction: column;
+      padding-bottom: var(--safe-b); max-height: 78vh;
     }
     .sheet.open { transform: translateY(0); }
-    .sheet-handle {
-      width: 40px; height: 4px; border-radius: 99px;
-      background: #d1d5db; margin: 10px auto 6px;
-    }
     .sheet-head {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 4px 16px 10px;
-      border-bottom: 1px solid var(--border);
+      padding: 14px 16px 8px; border-bottom: 1px solid #f1f5f9;
     }
-    .sheet-head h2 {
-      margin: 0; font-size: 1rem; font-weight: 700;
+    .sheet-head .title { font-weight: 700; }
+    .sheet-head button {
+      border: 0; background: transparent; font: inherit;
+      font-weight: 700; color: var(--accent); cursor: pointer; padding: 8px;
     }
-    .sheet-head .meta {
-      font-size: 0.8rem; color: var(--muted); font-weight: 500;
-    }
-    .sheet-close {
-      border: 0; background: #f1f5f9; color: var(--text);
-      width: 32px; height: 32px; border-radius: 999px;
-      font-size: 1.1rem; cursor: pointer; line-height: 1;
-    }
-    .sheet-body { padding: 8px 16px 0; }
+    .sheet-sub { text-align: center; font-size: 0.8rem; color: var(--muted); }
     .preview-score {
-      text-align: center;
-      font-size: 2.4rem;
-      font-weight: 800;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: -0.03em;
-      color: var(--navy);
-      margin: 6px 0 4px;
+      text-align: center; font-size: 2rem; font-weight: 800;
+      font-variant-numeric: tabular-nums; padding: 8px 0;
     }
-    .preview-score span { color: #94a3b8; font-weight: 600; font-size: 1.1rem; }
-
     .wheels {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 6px;
-      margin: 8px 0 4px;
-      position: relative;
-      height: var(--wheel-h);
-      user-select: none;
+      display: flex; justify-content: center; align-items: stretch;
+      gap: 4px; padding: 8px 20px 16px; position: relative;
     }
-    .wheels::before {
-      content: "";
-      position: absolute;
-      left: 8%; right: 8%;
-      top: 50%;
-      height: var(--item-h);
-      margin-top: calc(var(--item-h) / -2);
-      border-radius: 12px;
-      background: rgba(15, 39, 68, .06);
-      border: 1px solid rgba(15, 39, 68, .08);
-      pointer-events: none;
-      z-index: 1;
-    }
-    .wheels::after {
-      content: "";
-      position: absolute; inset: 0;
-      pointer-events: none; z-index: 2;
-      background: linear-gradient(
-        to bottom,
-        rgba(255,255,255,.95) 0%,
-        rgba(255,255,255,0) 28%,
-        rgba(255,255,255,0) 72%,
-        rgba(255,255,255,.95) 100%
-      );
+    .selection-bar {
+      position: absolute; left: 24px; right: 24px; top: 50%;
+      height: var(--item-h); margin-top: calc(var(--item-h) / -2);
+      border-radius: 12px; background: rgba(37,99,235,.1);
+      border: 1.5px solid rgba(37,99,235,.35); pointer-events: none; z-index: 0;
     }
     .wheel-col {
-      width: 72px;
-      height: var(--wheel-h);
-      overflow-y: auto;
-      overflow-x: hidden;
-      scroll-snap-type: y mandatory;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      position: relative;
-      z-index: 0;
+      width: 72px; height: var(--wheel-h);
+      overflow-y: auto; scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      position: relative; z-index: 1;
+      mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+      -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
     }
     .wheel-col::-webkit-scrollbar { display: none; }
-    .wheel-spacer {
-      height: calc((var(--wheel-h) - var(--item-h)) / 2);
-      flex-shrink: 0;
+    .wheel-dot {
+      width: 24px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; font-weight: 800; color: var(--muted); z-index: 1;
     }
     .wheel-item {
-      height: var(--item-h);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.45rem;
-      font-weight: 600;
-      color: #64748b;
-      scroll-snap-align: center;
-      scroll-snap-stop: always;
-      font-variant-numeric: tabular-nums;
+      height: var(--item-h); display: flex; align-items: center; justify-content: center;
+      font-size: 1.35rem; font-weight: 700; color: #94a3b8;
+      scroll-snap-align: center; font-variant-numeric: tabular-nums;
     }
-    .wheel-dot {
-      width: 28px;
-      text-align: center;
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: var(--navy);
-      z-index: 3;
-      margin-top: -2px;
-    }
-
-    .sheet-actions {
-      display: flex; gap: 8px;
-      padding: 12px 16px 4px;
-    }
-    .sheet-actions .btn { flex: 1; justify-content: center; padding: 12px; }
-    .sheet-actions .btn-clear {
-      flex: 0 0 auto;
-      color: var(--danger);
-      border-color: #fecaca;
-      background: #fff5f5;
-    }
-
-    /* Desktop: slightly larger table */
-    @media (min-width: 700px) {
-      .page { padding-top: 20px; }
-      table.marks { font-size: 0.92rem; }
-    }
+    .empty-pad { height: calc(var(--item-h) * 2); flex-shrink: 0; }
+    .sheet-actions { display: flex; gap: 8px; padding: 0 16px 16px; }
+    .sheet-actions .btn { flex: 1; justify-content: center; }
   </style>
 </head>
 <body>
   <header class="app-bar">
-    <a class="back" href="index.html" title="Về trang chủ" aria-label="Back">←</a>
+    <a class="back" href="index.html" aria-label="Back">←</a>
     <h1>Mark Details</h1>
-    <div class="menu">
-      <button type="button" class="icon-btn" id="btn-reset" title="Reset mẫu mặc định">↺</button>
-    </div>
   </header>
 
   <main class="page">
     <p class="hint">
-      What-if <strong>zero-install</strong>: gõ weight &amp; điểm như My FAP.
-      Trên điện thoại, chạm <strong>Value</strong> → bánh xe 0–9.
-      Dữ liệu lưu local trên máy bạn.
+      <strong>Bước 1:</strong> Chụp / upload ảnh bảng điểm My FAP (Mark Details).<br />
+      <strong>Bước 2:</strong> OCR tự nhận thẻ (category, item, weight, value).<br />
+      <strong>Bước 3:</strong> Chạm Value → bánh xe sửa what-if → Average.
     </p>
 
-    <div class="course-bar">
-      <input type="text" id="course-name" placeholder="Tên môn (vd. PRJ301)" autocomplete="off" />
-    </div>
+    <section class="ocr-card" id="ocrCard">
+      <p class="ocr-title">📷 Ảnh Mark Details</p>
+      <p class="ocr-sub">
+        Chụp full bảng (Grade category → Value). Crop gọn, chữ rõ = OCR chính xác hơn.
+      </p>
+      <div class="ocr-actions">
+        <label class="btn btn-primary" for="fileCamera">
+          Chụp ảnh
+          <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden />
+        </label>
+        <label class="btn" for="fileGallery">
+          Thư viện
+          <input type="file" id="fileGallery" accept="image/*" hidden />
+        </label>
+      </div>
+      <div class="preview-wrap" id="previewWrap">
+        <img id="previewImg" alt="Preview ảnh OCR" />
+      </div>
+      <div class="progress" id="progress"><i id="progressBar"></i></div>
+      <div class="ocr-status" id="ocrStatus">Chưa có ảnh — chọn hoặc kéo thả vào đây.</div>
+      <button type="button" class="raw-toggle" id="rawToggle">Xem text OCR thô</button>
+      <pre class="raw-box" id="rawBox"></pre>
+    </section>
 
-    <div class="mark-card">
-      <div class="table-scroll">
-        <table class="marks" id="marks-table" aria-label="Mark Details">
-          <thead>
-            <tr>
-              <th>Grade category</th>
-              <th>Grade item</th>
-              <th>Weight</th>
-              <th>Value</th>
-              <th aria-hidden="true"></th>
-            </tr>
-          </thead>
-          <tbody id="marks-body"></tbody>
-        </table>
+    <section class="table-section" id="tableSection">
+      <div class="course-bar">
+        <input type="text" id="courseName" placeholder="Tên môn (tuỳ chọn)" autocomplete="off" />
       </div>
-      <div class="tools">
-        <button type="button" class="btn btn-primary" id="btn-add">+ Thêm dòng</button>
-        <button type="button" class="btn" id="btn-template">Mẫu My FAP</button>
-        <button type="button" class="btn btn-ghost" id="btn-clear-values">Xóa điểm</button>
+      <div class="mark-card">
+        <div class="table-scroll">
+          <table class="marks">
+            <thead>
+              <tr>
+                <th>Grade category</th>
+                <th>Grade item</th>
+                <th>Weight</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody id="marksBody"></tbody>
+          </table>
+        </div>
+        <div class="tools">
+          <button type="button" class="btn" id="btnReocr">OCR ảnh khác</button>
+          <button type="button" class="btn btn-ghost" id="btnClearVals">Xóa điểm what-if</button>
+        </div>
       </div>
-    </div>
 
-    <div class="result">
-      <div class="box">
-        <div class="label">Average</div>
-        <div class="big" id="avg-display">0.0</div>
-        <div class="sub">Σ (value × weight / 100)</div>
+      <div class="result">
+        <div class="box">
+          <div class="label">Average</div>
+          <div class="big" id="avgDisplay">0.0</div>
+        </div>
+        <div class="box">
+          <div class="label">Letter</div>
+          <div class="big"><span class="letter" id="letterDisplay">—</span></div>
+        </div>
       </div>
-      <div class="box">
-        <div class="label">Letter · GPA</div>
-        <div class="big"><span class="letter" id="letter-display">—</span></div>
-        <div class="sub" id="gpa-display">4.0 scale: —</div>
-      </div>
-    </div>
-
-    <div class="need-fe">
-      <h3>Cần điểm FE bao nhiêu?</h3>
-      <div class="row">
-        <label for="target-avg">Mục tiêu TB</label>
-        <input type="number" id="target-avg" min="0" max="10" step="0.1" value="5.0" />
-        <label for="fe-select">Thành phần FE</label>
-        <select id="fe-select"></select>
-      </div>
-      <div class="answer" id="need-fe-answer">Chọn dòng Final / FE rồi xem điểm cần đạt.</div>
-    </div>
+    </section>
 
     <p class="footer-note">
-      Không liên kết FPT University · Chỉ ước lượng cá nhân ·
-      <a href="index.html">Userscript trên FAP</a> ·
-      <a href="https://github.com/Vlantoy/fap-grade-calculator" target="_blank" rel="noopener">GitHub</a>
+      OCR chạy <strong>trên máy bạn</strong> (Tesseract.js) · không gửi ảnh lên server ·
+      <a href="index.html">Trang chủ</a>
     </p>
   </main>
 
-  <!-- Picker sheet -->
   <div class="overlay" id="overlay" hidden></div>
-  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
-    <div class="sheet-handle" aria-hidden="true"></div>
+  <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true">
     <div class="sheet-head">
-      <div>
-        <h2 id="sheet-title">Nhập điểm</h2>
-        <div class="meta" id="sheet-meta"></div>
-      </div>
-      <button type="button" class="sheet-close" id="sheet-close" aria-label="Đóng">×</button>
+      <button type="button" id="sheetCancel">Hủy</button>
+      <div class="title">Nhập điểm</div>
+      <button type="button" id="sheetDone">Xong</button>
     </div>
-    <div class="sheet-body">
-      <div class="preview-score" id="preview-score">0.0</div>
-      <div class="wheels" id="wheels">
-        <div class="wheel-col" id="wheel-int" tabindex="0" aria-label="Phần nguyên"></div>
-        <div class="wheel-dot">.</div>
-        <div class="wheel-col" id="wheel-dec" tabindex="0" aria-label="Phần thập phân"></div>
-      </div>
+    <div class="sheet-sub" id="sheetSub"></div>
+    <div class="preview-score" id="sheetPreview">0.0</div>
+    <div class="wheels">
+      <div class="selection-bar"></div>
+      <div class="wheel-col" id="wheelInt"></div>
+      <div class="wheel-dot">.</div>
+      <div class="wheel-col" id="wheelDec"></div>
     </div>
     <div class="sheet-actions">
-      <button type="button" class="btn btn-clear" id="sheet-clear">Xóa</button>
-      <button type="button" class="btn" id="sheet-cancel">Hủy</button>
-      <button type="button" class="btn btn-primary" id="sheet-ok">Xong</button>
+      <button type="button" class="btn" id="sheetClear">Để trống</button>
+      <button type="button" class="btn btn-primary" id="sheetOk">Áp dụng</button>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
 (function () {
   'use strict';
 
-  var STORE_KEY = 'fap_whatif_v1';
-  var RESIT_RE = /\bresit\b|thi\s*lại|thi\s*lai|retake|học\s*lại|hoc\s*lai/i;
+  var RESIT_RE = /\bresit\b|thi\s*l[aạ]i|retake/i;
+  var HEADER_RE = /grade\s*category|grade\s*item|weight|value|mark\s*details|comment/i;
+  var SKIP_LINE_RE = /course\s*total|status|studying|average|^no\.?$|copyright|fpt/i;
+  var CAT_HINT =
+    /assignment|progress|practical|final|quiz|lab|midterm|presentation|workshop|attendance|participation|project|fe\b|pe\b|resit|thi\s*l/i;
+  var ITEM_H = 42;
 
-  /** @typedef {{ id:string, category:string, item:string, weight:number, value:number|null, isTotal?:boolean, isFooter?:boolean }} Row */
+  /** @type {{id:string, category:string, item:string, weight:number, value:number|null, isTotal:boolean}[]} */
+  var rows = [];
+  var editId = null;
+  var snapTimers = { int: null, dec: null };
+  var lastFile = null;
 
   function uid() {
-    return 'r' + Math.random().toString(36).slice(2, 10);
+    return 'r' + Math.random().toString(36).slice(2, 9);
   }
-
-  function defaultTemplate() {
-    // Layout giống screenshot My FAP Mark Details (template điển hình)
-    var rows = [];
-    function add(cat, item, weight, value, isTotal) {
-      rows.push({
-        id: uid(),
-        category: cat,
-        item: item,
-        weight: weight,
-        value: value == null ? null : value,
-        isTotal: !!isTotal,
-      });
-    }
-    add('Assignment', 'Assignment 1', 10, null, false);
-    add('', 'Assignment 2', 10, null, false);
-    add('', 'Total', 20, null, true);
-    add('Progress test', 'Progress test 1', 10, 8.3, false);
-    add('', 'Progress test 2', 10, null, false);
-    add('', 'Total', 20, null, true);
-    add('Practical Exam', 'Practical Exam', 30, null, false);
-    add('', 'Total', 30, null, true);
-    add('Final Exam', 'Final Exam', 30, null, false);
-    add('', 'Total', 30, null, true);
-    add('Final Exam Resit', 'Final Exam Resit', 30, null, false);
-    add('', 'Total', 30, null, true);
-    return { courseName: '', rows: rows };
-  }
-
-  function isTotalLabel(s) {
-    return /^total$/i.test(String(s || '').trim());
-  }
-  function isResitName(name) {
-    return RESIT_RE.test(name || '');
+  function isResit(s) {
+    return RESIT_RE.test(s || '');
   }
   function baseKey(name) {
     return String(name || '')
@@ -622,9 +423,7 @@
   }
   function clampScore(v) {
     if (v == null || !isFinite(v)) return null;
-    if (v < 0) return 0;
-    if (v > 10) return 10;
-    return Math.round(v * 10) / 10;
+    return Math.min(10, Math.max(0, Math.round(v * 10) / 10));
   }
   function letterOf(m) {
     if (m == null || !isFinite(m)) return '—';
@@ -638,545 +437,609 @@
     if (m >= 4) return 'D';
     return 'F';
   }
-  function gpaPoint(m) {
-    if (m == null || !isFinite(m) || m < 4) return 0;
-    if (m >= 9) return 4.0;
-    if (m >= 8.5) return 3.7;
-    if (m >= 8) return 3.5;
-    if (m >= 7) return 3.0;
-    if (m >= 6.5) return 2.5;
-    if (m >= 5.5) return 2.0;
-    if (m >= 5) return 1.5;
-    if (m >= 4) return 1.0;
-    return 0;
-  }
-  function fmtScore(v) {
-    if (v == null || !isFinite(v)) return '';
+  function fmt(v) {
+    if (v == null) return '—';
     return (Math.round(v * 10) / 10).toFixed(1);
   }
   function escapeHtml(s) {
     return String(s)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/>/g, '&gt;');
   }
 
-  /** Build scorable components (skip Total rows) */
-  function scorableRows(rows) {
+  function scorable() {
+    return rows.filter(function (r) {
+      return !r.isTotal && r.weight > 0 && !/^average$/i.test(r.item);
+    });
+  }
+
+  function calcAverage() {
+    var comps = scorable();
+    var resitOn = {};
+    comps.forEach(function (c) {
+      if (isResit(c.item) && c.value != null) resitOn[baseKey(c.item)] = true;
+    });
+    var sum = 0;
+    comps.forEach(function (c) {
+      if (isResit(c.item)) {
+        if (c.value == null) return;
+        sum += (c.value * c.weight) / 100;
+        return;
+      }
+      if (resitOn[baseKey(c.item)]) return;
+      sum += ((c.value == null ? 0 : c.value) * c.weight) / 100;
+    });
+    return Math.round(sum * 100) / 100;
+  }
+
+  // ---------- OCR parse ----------
+  function cleanOcrText(text) {
+    return String(text || '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/[|¦]/g, ' ')
+      .replace(/(\d)\s*[oO]\s*%/g, '$1.0 %') // 10 o % weirdness
+      .replace(/(\d)[, ](\d)\s*%/g, '$1.$2 %')
+      .replace(/(\d)\s+\.\s*(\d)/g, '$1.$2');
+  }
+
+  /**
+   * Parse FAP Mark Details OCR text into rows.
+   * Strategy: every weight "X.X %" is a component; text before = item; optional value after.
+   */
+  function parseMarkDetailsText(raw) {
+    var text = cleanOcrText(raw);
+    var lines = text
+      .split(/\r?\n/)
+      .map(function (l) {
+        return l.replace(/\s+/g, ' ').trim();
+      })
+      .filter(Boolean);
+
+    // Also flatten for multi-line items
+    var flat = lines.join('\n');
+
+    var WEIGHT_RE = /(\d{1,2}(?:[.,]\d+)?)\s*%/g;
+    var found = [];
+    var m;
+    var searchIn = lines.join(' · '); // single stream with separators
+
+    // Work line by line first
+    var lastCategory = '';
+    for (var li = 0; li < lines.length; li++) {
+      var line = lines[li];
+      if (HEADER_RE.test(line) && !WEIGHT_RE.test(line)) continue;
+      if (SKIP_LINE_RE.test(line) && !/resit/i.test(line)) continue;
+
+      WEIGHT_RE.lastIndex = 0;
+      var wm = WEIGHT_RE.exec(line);
+      if (!wm) {
+        // category-only line?
+        if (CAT_HINT.test(line) && line.length < 40 && !/\d/.test(line)) {
+          lastCategory = line;
+        }
+        continue;
+      }
+
+      var weight = parseFloat(wm[1].replace(',', '.'));
+      if (!isFinite(weight) || weight <= 0 || weight > 100) continue;
+
+      var before = line.slice(0, wm.index).trim();
+      var after = line.slice(wm.index + wm[0].length).trim();
+
+      // value: number 0-10 after weight
+      var value = null;
+      var vm = after.match(/^(\d{1,2}(?:[.,]\d+)?)\b/);
+      if (vm) {
+        var vv = parseFloat(vm[1].replace(',', '.'));
+        if (vv >= 0 && vv <= 10) value = clampScore(vv);
+      }
+
+      // item name
+      var item = before
+        .replace(/^[\-·•\d.)\s]+/, '')
+        .replace(/\b(grade\s*item|weight|value)\b/gi, '')
+        .trim();
+
+      // pull category if glued
+      var category = lastCategory;
+      var catMatch = item.match(
+        /^(Assignment|Progress\s*test|Practical\s*Exam|Final\s*Exam(?:\s*Resit)?|Lab|Quiz|Project|FE|PE)\b/i
+      );
+      if (catMatch) {
+        category = catMatch[0];
+        // keep item as is or strip duplicate
+        if (item.length < catMatch[0].length + 2) {
+          // item might be same as category
+        }
+        lastCategory = category;
+      } else if (CAT_HINT.test(item) && item.length < 28) {
+        // entire "before" is category; item might be on previous line
+        if (li > 0) {
+          var prev = lines[li - 1];
+          if (prev && !/(\d)\s*%/.test(prev) && !HEADER_RE.test(prev) && prev.length < 48) {
+            if (CAT_HINT.test(prev) || !/\d/.test(prev)) {
+              category = prev;
+              lastCategory = category;
+            } else {
+              item = prev + ' ' + item;
+            }
+          }
+        }
+        if (/^(Assignment|Progress|Practical|Final|Lab)/i.test(item) && item.split(' ').length <= 3) {
+          category = item;
+          lastCategory = category;
+        }
+      }
+
+      // previous line as item if before empty
+      if (!item && li > 0) {
+        var p2 = lines[li - 1];
+        if (p2 && !/(\d)\s*%/.test(p2) && !HEADER_RE.test(p2) && !SKIP_LINE_RE.test(p2)) {
+          item = p2;
+        }
+      }
+
+      item = item.replace(/\s+/g, ' ').trim() || 'Component';
+      var isTotal = /^total$/i.test(item);
+
+      // skip pure Average 0.0 as component if labeled average
+      if (/^average$/i.test(item)) continue;
+
+      found.push({
+        id: uid(),
+        category: category || '',
+        item: item,
+        weight: weight,
+        value: isTotal ? null : value,
+        isTotal: isTotal,
+      });
+
+      if (!isTotal && CAT_HINT.test(item)) {
+        lastCategory = item;
+      }
+    }
+
+    // Fallback: global weight scan if line parser got almost nothing
+    if (found.length < 2) {
+      found = parseMarkDetailsFallback(text);
+    }
+
+    // Drop header junk weights
+    found = found.filter(function (r) {
+      if (HEADER_RE.test(r.item)) return false;
+      if (/^value$/i.test(r.item)) return false;
+      return true;
+    });
+
+    // Propagate category downward
+    var cat = '';
+    for (var i = 0; i < found.length; i++) {
+      if (found[i].category) cat = found[i].category;
+      else found[i].category = cat;
+      // If item looks like category and next has no cat
+      if (!found[i].isTotal && CAT_HINT.test(found[i].item) && found[i].item.length < 30) {
+        // keep
+      }
+    }
+
+    return found;
+  }
+
+  function parseMarkDetailsFallback(text) {
     var out = [];
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      if (r.isTotal || isTotalLabel(r.item)) continue;
-      if (!(r.weight > 0)) continue;
+    var re = /([A-Za-z][A-Za-z0-9:.\s\-_]{0,40}?)\s+(\d{1,2}(?:[.,]\d+)?)\s*%(?:\s+(\d{1,2}(?:[.,]\d+)?))?/g;
+    var m;
+    var t = cleanOcrText(text).replace(/\n/g, ' ');
+    while ((m = re.exec(t))) {
+      var item = m[1].replace(/\s+/g, ' ').trim();
+      if (HEADER_RE.test(item) || item.length < 2) continue;
+      var w = parseFloat(m[2].replace(',', '.'));
+      if (!(w > 0 && w <= 100)) continue;
+      var val = null;
+      if (m[3] != null) {
+        var vv = parseFloat(m[3].replace(',', '.'));
+        if (vv >= 0 && vv <= 10) val = clampScore(vv);
+      }
       out.push({
-        id: r.id,
-        name: r.item,
-        weight: Number(r.weight) || 0,
-        value: r.value,
-        resit: isResitName(r.item) || isResitName(r.category),
-        key: baseKey(r.item),
+        id: uid(),
+        category: '',
+        item: item,
+        weight: w,
+        value: /^total$/i.test(item) ? null : val,
+        isTotal: /^total$/i.test(item),
       });
     }
     return out;
   }
 
-  function computeAverage(rows) {
-    var comps = scorableRows(rows);
-    var resitOn = {};
-    var i;
-    for (i = 0; i < comps.length; i++) {
-      if (comps[i].resit && comps[i].value != null) {
-        resitOn[comps[i].key] = true;
-      }
-    }
-    var sum = 0;
-    for (i = 0; i < comps.length; i++) {
-      var c = comps[i];
-      if (c.resit) {
-        if (c.value == null) continue;
-        sum += (c.value * c.weight) / 100;
-        continue;
-      }
-      if (resitOn[c.key]) continue;
-      var v = c.value == null ? 0 : c.value;
-      sum += (v * c.weight) / 100;
-    }
-    return Math.round(sum * 100) / 100;
-  }
-
-  /**
-   * Reverse: what FE value needed for target average.
-   * Treats empty non-FE as 0 (same as average formula).
-   */
-  function neededScore(rows, targetId, targetAvg) {
-    var comps = scorableRows(rows);
-    var target = null;
-    var i;
-    for (i = 0; i < comps.length; i++) {
-      if (comps[i].id === targetId) { target = comps[i]; break; }
-    }
-    if (!target || !(target.weight > 0)) return { ok: false, msg: 'Chọn thành phần hợp lệ (có weight).' };
-
-    // Simulate with target as resit/first accordingly
-    var resitOn = {};
-    for (i = 0; i < comps.length; i++) {
-      if (comps[i].id === target.id) continue;
-      if (comps[i].resit && comps[i].value != null) resitOn[comps[i].key] = true;
-    }
-    // If target is resit and we set a value, it activates resit for its key
-    if (target.resit) resitOn[target.key] = true;
-
-    var sumOthers = 0;
-    for (i = 0; i < comps.length; i++) {
-      var c = comps[i];
-      if (c.id === target.id) continue;
-      if (c.resit) {
-        if (c.value == null) continue;
-        sumOthers += (c.value * c.weight) / 100;
-        continue;
-      }
-      if (resitOn[c.key]) continue;
-      var v = c.value == null ? 0 : c.value;
-      sumOthers += (v * c.weight) / 100;
-    }
-
-    var need = ((targetAvg - sumOthers) * 100) / target.weight;
-    need = Math.round(need * 100) / 100;
-    return { ok: true, need: need, weight: target.weight, name: target.name };
-  }
-
-  // ----- state -----
-  var state = loadState();
-
-  function loadState() {
-    try {
-      var raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return defaultTemplate();
-      var o = JSON.parse(raw);
-      if (!o || !Array.isArray(o.rows) || !o.rows.length) return defaultTemplate();
-      return {
-        courseName: o.courseName || '',
-        rows: o.rows.map(function (r) {
-          return {
-            id: r.id || uid(),
-            category: r.category || '',
-            item: r.item || '',
-            weight: Number(r.weight) || 0,
-            value: r.value == null || r.value === '' ? null : clampScore(Number(r.value)),
-            isTotal: !!r.isTotal || isTotalLabel(r.item),
-          };
-        }),
-      };
-    } catch (e) {
-      return defaultTemplate();
-    }
-  }
-
-  function saveState() {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify({
-        courseName: state.courseName,
-        rows: state.rows,
-      }));
-    } catch (e) {}
-  }
-
-  // ----- DOM -----
-  var bodyEl = document.getElementById('marks-body');
-  var courseInput = document.getElementById('course-name');
-  var avgDisplay = document.getElementById('avg-display');
-  var letterDisplay = document.getElementById('letter-display');
-  var gpaDisplay = document.getElementById('gpa-display');
-  var feSelect = document.getElementById('fe-select');
-  var targetAvgInput = document.getElementById('target-avg');
-  var needFeAnswer = document.getElementById('need-fe-answer');
-
-  var overlay = document.getElementById('overlay');
-  var sheet = document.getElementById('sheet');
-  var sheetMeta = document.getElementById('sheet-meta');
-  var previewScore = document.getElementById('preview-score');
-  var wheelInt = document.getElementById('wheel-int');
-  var wheelDec = document.getElementById('wheel-dec');
-
-  var pickerRowId = null;
-  var pickInt = 0;
-  var pickDec = 0;
-  var syncingScroll = false;
-
-  courseInput.value = state.courseName;
-  courseInput.addEventListener('input', function () {
-    state.courseName = courseInput.value;
-    saveState();
-  });
-
-  function findRow(id) {
-    for (var i = 0; i < state.rows.length; i++) {
-      if (state.rows[i].id === id) return state.rows[i];
-    }
-    return null;
-  }
-
+  // ---------- Render ----------
   function render() {
+    var body = document.getElementById('marksBody');
+    var section = document.getElementById('tableSection');
+    if (!rows.length) {
+      section.classList.remove('show');
+      return;
+    }
+    section.classList.add('show');
+    document.getElementById('ocrCard').classList.add('has-table');
+
     var html = '';
-    var lastCat = '';
-    var i;
-    for (i = 0; i < state.rows.length; i++) {
-      var r = state.rows[i];
-      var isTotal = r.isTotal || isTotalLabel(r.item);
-      r.isTotal = isTotal;
-      var catShow = r.category;
-      if (!catShow && !isTotal) catShow = '';
-      var trClass = isTotal ? ' is-total' : '';
-      var valHtml;
-      if (isTotal) {
-        valHtml = '<span class="val-btn readonly empty">—</span>';
+    var lastCat = null;
+    rows.forEach(function (r) {
+      var cls = r.isTotal ? ' is-total' : '';
+      html += '<tr class="' + cls + '">';
+      var catShow = r.category && r.category !== lastCat ? r.category : '';
+      if (r.category) lastCat = r.category;
+      html += '<td class="cat">' + escapeHtml(catShow) + '</td>';
+      html += '<td class="item">' + escapeHtml(r.item) + '</td>';
+      html += '<td class="weight">' + r.weight.toFixed(1) + ' %</td>';
+      html += '<td class="value">';
+      if (r.isTotal) {
+        html += '';
       } else {
         var has = r.value != null;
-        valHtml =
-          '<button type="button" class="val-btn' + (has ? '' : ' empty') + '" data-pick="' +
-          escapeHtml(r.id) + '" aria-label="Nhập điểm ' + escapeHtml(r.item) + '">' +
-          (has ? fmtScore(r.value) : '—') +
+        html +=
+          '<button type="button" class="val-btn' +
+          (has ? '' : ' empty') +
+          '" data-edit="' +
+          r.id +
+          '">' +
+          (has ? fmt(r.value) : '···') +
           '</button>';
       }
-      html +=
-        '<tr class="' + trClass.trim() + '" data-id="' + escapeHtml(r.id) + '">' +
-        '<td class="cat"><input class="row-edit" data-f="category" data-id="' + escapeHtml(r.id) + '" value="' + escapeHtml(r.category) + '" placeholder="—" /></td>' +
-        '<td class="item"><input class="row-edit" data-f="item" data-id="' + escapeHtml(r.id) + '" value="' + escapeHtml(r.item) + '" placeholder="Grade item" /></td>' +
-        '<td class="weight"><input class="row-edit w-sm muted" data-f="weight" data-id="' + escapeHtml(r.id) + '" value="' + (r.weight ? (Number(r.weight).toFixed(1) + ' %') : '') + '" placeholder="0 %" inputmode="decimal" /></td>' +
-        '<td class="value">' + valHtml + '</td>' +
-        '<td class="actions"><button type="button" class="del-btn" data-del="' + escapeHtml(r.id) + '" title="Xóa dòng" aria-label="Xóa">×</button></td>' +
-        '</tr>';
-      lastCat = r.category || lastCat;
-    }
+      html += '</td></tr>';
+    });
 
-    // Footer: Average + Status (read-only like My FAP)
-    var avg = computeAverage(state.rows);
-    var letter = letterOf(avg);
-    var statusText = avg >= 4 ? 'Studying' : 'Not passed*';
-    var statusClass = avg >= 4 ? 'status-study' : 'status-fail';
-    if (avg === 0 && scorableRows(state.rows).every(function (c) { return c.value == null; })) {
-      statusText = 'Studying';
-      statusClass = 'status-study';
-    }
-
+    var avg = calcAverage();
     html +=
-      '<tr class="is-avg">' +
-      '<td class="cat">Course total</td>' +
-      '<td class="item">Average</td>' +
-      '<td class="weight" colspan="1"></td>' +
-      '<td class="value"><span class="val-btn readonly">' + avg.toFixed(1) + '</span></td>' +
-      '<td class="actions"></td>' +
-      '</tr>' +
-      '<tr class="is-status">' +
-      '<td class="cat"></td>' +
-      '<td class="item">Status</td>' +
-      '<td class="weight"></td>' +
-      '<td class="value"><span class="' + statusClass + '">' + statusText + '</span></td>' +
-      '<td class="actions"></td>' +
-      '</tr>';
+      '<tr class="is-avg"><td class="cat">Course total</td><td>Average</td><td></td><td class="value">' +
+      avg.toFixed(1) +
+      '</td></tr>';
+    html +=
+      '<tr class="is-avg"><td></td><td>Status</td><td></td><td class="value" style="color:#16a34a">Studying</td></tr>';
 
-    bodyEl.innerHTML = html;
-
-    avgDisplay.textContent = avg.toFixed(1);
-    letterDisplay.textContent = letter;
-    gpaDisplay.textContent = '4.0 scale: ' + gpaPoint(avg).toFixed(1);
-
-    fillFeSelect();
-    updateNeedFe();
-    saveState();
+    body.innerHTML = html;
+    document.getElementById('avgDisplay').textContent = avg.toFixed(1);
+    document.getElementById('letterDisplay').textContent = letterOf(avg);
   }
 
-  function fillFeSelect() {
-    var comps = scorableRows(state.rows);
-    var prev = feSelect.value;
-    var opts = '';
-    var best = '';
-    for (var i = 0; i < comps.length; i++) {
-      var c = comps[i];
-      var label = c.name + ' (' + c.weight + '%)';
-      opts += '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(label) + '</option>';
-      if (!best && /final|fe\b|resit|thi\s*cu[oô]i/i.test(c.name)) best = c.id;
-    }
-    feSelect.innerHTML = opts || '<option value="">—</option>';
-    if (prev && comps.some(function (c) { return c.id === prev; })) {
-      feSelect.value = prev;
-    } else if (best) {
-      feSelect.value = best;
-    }
+  // ---------- Image preprocess + OCR ----------
+  function setStatus(msg, kind) {
+    var el = document.getElementById('ocrStatus');
+    el.textContent = msg;
+    el.className = 'ocr-status' + (kind ? ' ' + kind : '');
   }
 
-  function updateNeedFe() {
-    var tid = feSelect.value;
-    var target = parseFloat(String(targetAvgInput.value).replace(',', '.'));
-    if (!tid) {
-      needFeAnswer.textContent = 'Thêm thành phần có weight trước.';
-      needFeAnswer.className = 'answer';
+  function setProgress(p) {
+    var bar = document.getElementById('progress');
+    var fill = document.getElementById('progressBar');
+    if (p == null) {
+      bar.classList.remove('show');
+      fill.style.width = '0%';
       return;
     }
-    if (!isFinite(target)) {
-      needFeAnswer.textContent = 'Nhập mục tiêu TB hợp lệ (0–10).';
-      needFeAnswer.className = 'answer bad';
-      return;
-    }
-    var r = neededScore(state.rows, tid, target);
-    if (!r.ok) {
-      needFeAnswer.textContent = r.msg;
-      needFeAnswer.className = 'answer bad';
-      return;
-    }
-    if (r.need > 10) {
-      needFeAnswer.textContent =
-        'Cần ' + r.need.toFixed(1) + ' ở «' + r.name + '» — vượt 10. Không đủ dù full 10.';
-      needFeAnswer.className = 'answer bad';
-    } else if (r.need <= 0) {
-      needFeAnswer.textContent =
-        'Đã đạt mục tiêu ' + target.toFixed(1) + ' dù «' + r.name + '» = 0 (cần tối thiểu 0.0).';
-      needFeAnswer.className = 'answer ok';
-    } else {
-      needFeAnswer.textContent =
-        'Cần ≥ ' + r.need.toFixed(1) + ' ở «' + r.name + '» (' + r.weight + '%) để TB = ' + target.toFixed(1) + '.';
-      needFeAnswer.className = 'answer ok';
-    }
+    bar.classList.add('show');
+    fill.style.width = Math.max(0, Math.min(100, p)) + '%';
   }
 
-  // Event: table
-  bodyEl.addEventListener('click', function (e) {
-    var t = e.target;
-    if (!(t instanceof Element)) return;
-    var pick = t.closest('[data-pick]');
-    if (pick) {
-      openPicker(pick.getAttribute('data-pick'));
+  function preprocessImage(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var maxW = 1600;
+          var scale = img.width > maxW ? maxW / img.width : 1;
+          // upscale small images for OCR
+          if (img.width < 900) scale = Math.min(2, 1100 / img.width);
+          var w = Math.round(img.width * scale);
+          var h = Math.round(img.height * scale);
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          var id = ctx.getImageData(0, 0, w, h);
+          var d = id.data;
+          for (var i = 0; i < d.length; i += 4) {
+            var g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            // contrast
+            g = (g - 128) * 1.35 + 128;
+            if (g < 0) g = 0;
+            if (g > 255) g = 255;
+            // mild threshold-ish
+            d[i] = d[i + 1] = d[i + 2] = g;
+          }
+          ctx.putImageData(id, 0, 0);
+          URL.revokeObjectURL(url);
+          canvas.toBlob(
+            function (blob) {
+              if (!blob) reject(new Error('canvas blob failed'));
+              else resolve(blob);
+            },
+            'image/png',
+            0.95
+          );
+        } catch (e) {
+          URL.revokeObjectURL(url);
+          reject(e);
+        }
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('Không đọc được ảnh'));
+      };
+      img.src = url;
+    });
+  }
+
+  async function runOcr(file) {
+    if (!window.Tesseract) {
+      setStatus('Chưa load được Tesseract.js — kiểm tra mạng.', 'err');
       return;
     }
-    var del = t.closest('[data-del]');
-    if (del) {
-      var id = del.getAttribute('data-del');
-      state.rows = state.rows.filter(function (r) { return r.id !== id; });
-      if (!state.rows.length) state = defaultTemplate();
+    lastFile = file;
+    var preview = document.getElementById('previewImg');
+    var wrap = document.getElementById('previewWrap');
+    preview.src = URL.createObjectURL(file);
+    wrap.classList.add('show');
+
+    setStatus('Đang xử lý ảnh…');
+    setProgress(5);
+
+    var blob;
+    try {
+      blob = await preprocessImage(file);
+    } catch (e) {
+      blob = file;
+    }
+
+    setStatus('OCR đang đọc chữ (lần đầu có thể tải model ~1 phút)…');
+    try {
+      var result = await Tesseract.recognize(blob, 'eng', {
+        logger: function (m) {
+          if (m.status === 'recognizing text' && m.progress != null) {
+            setProgress(10 + m.progress * 85);
+            setStatus('OCR… ' + Math.round(m.progress * 100) + '%');
+          } else if (m.status) {
+            setStatus(m.status + '…');
+          }
+        },
+      });
+      var text = (result && result.data && result.data.text) || '';
+      document.getElementById('rawBox').textContent = text;
+      document.getElementById('rawToggle').classList.add('show');
+
+      var parsed = parseMarkDetailsText(text);
+      if (!parsed.length) {
+        setProgress(100);
+        setStatus(
+          'Không nhận ra dòng weight (vd 10.0 %). Thử crop sát bảng, chụp rõ hơn, đủ cột Weight.',
+          'err'
+        );
+        return;
+      }
+
+      rows = parsed;
+      setProgress(100);
+      setStatus(
+        'OK — nhận ' +
+          parsed.length +
+          ' dòng (' +
+          scorable().length +
+          ' thành phần có thể nhập điểm). Chạm Value để sửa.',
+        'ok'
+      );
       render();
+      document.getElementById('tableSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (err) {
+      console.error(err);
+      setStatus('OCR lỗi: ' + (err && err.message ? err.message : String(err)), 'err');
+      setProgress(null);
     }
-  });
-
-  bodyEl.addEventListener('change', onFieldEdit);
-  bodyEl.addEventListener('blur', onFieldEdit, true);
-
-  function onFieldEdit(e) {
-    var t = e.target;
-    if (!(t instanceof HTMLInputElement) || !t.hasAttribute('data-f')) return;
-    var id = t.getAttribute('data-id');
-    var f = t.getAttribute('data-f');
-    var row = findRow(id);
-    if (!row) return;
-    if (f === 'category') row.category = t.value;
-    if (f === 'item') {
-      row.item = t.value;
-      row.isTotal = isTotalLabel(t.value);
-    }
-    if (f === 'weight') {
-      var m = String(t.value).replace(',', '.').match(/(\d+(?:\.\d+)?)/);
-      row.weight = m ? parseFloat(m[1]) : 0;
-      t.value = row.weight ? row.weight.toFixed(1) + ' %' : '';
-    }
-    render();
   }
 
-  document.getElementById('btn-add').addEventListener('click', function () {
-    state.rows.push({
-      id: uid(),
-      category: '',
-      item: 'New item',
-      weight: 10,
-      value: null,
-      isTotal: false,
-    });
-    render();
-  });
+  function onFiles(fileList) {
+    var f = fileList && fileList[0];
+    if (!f) return;
+    if (!/^image\//.test(f.type) && !/\.(png|jpe?g|webp|heic)$/i.test(f.name || '')) {
+      setStatus('Chọn file ảnh (PNG/JPG).', 'err');
+      return;
+    }
+    runOcr(f);
+  }
 
-  document.getElementById('btn-template').addEventListener('click', function () {
-    if (!confirm('Load mẫu Mark Details My FAP? (ghi đè bảng hiện tại)')) return;
-    var name = state.courseName;
-    state = defaultTemplate();
-    state.courseName = name;
-    courseInput.value = name;
-    render();
-  });
-
-  document.getElementById('btn-reset').addEventListener('click', function () {
-    if (!confirm('Reset toàn bộ về mẫu mặc định?')) return;
-    state = defaultTemplate();
-    courseInput.value = '';
-    render();
-  });
-
-  document.getElementById('btn-clear-values').addEventListener('click', function () {
-    for (var i = 0; i < state.rows.length; i++) state.rows[i].value = null;
-    render();
-  });
-
-  feSelect.addEventListener('change', updateNeedFe);
-  targetAvgInput.addEventListener('input', updateNeedFe);
-
-  // ----- Wheel picker -----
+  // ---------- Wheel ----------
   function buildWheel(el, max) {
-    var h = '';
-    h += '<div class="wheel-spacer"></div>';
+    el.innerHTML = '';
+    var pad = document.createElement('div');
+    pad.className = 'empty-pad';
+    el.appendChild(pad);
     for (var i = 0; i <= max; i++) {
-      h += '<div class="wheel-item" data-v="' + i + '">' + i + '</div>';
+      var d = document.createElement('div');
+      d.className = 'wheel-item';
+      d.textContent = String(i);
+      d.dataset.v = String(i);
+      el.appendChild(d);
     }
-    h += '<div class="wheel-spacer"></div>';
-    el.innerHTML = h;
+    var pad2 = document.createElement('div');
+    pad2.className = 'empty-pad';
+    el.appendChild(pad2);
   }
-
-  buildWheel(wheelInt, 10); // 0..10
-  buildWheel(wheelDec, 9);  // 0..9
-
-  function scrollToValue(el, v, smooth) {
-    var item = el.querySelector('.wheel-item[data-v="' + v + '"]');
-    if (!item) return;
-    var top = item.offsetTop - (el.clientHeight - item.clientHeight) / 2;
-    el.scrollTo({ top: top, behavior: smooth ? 'smooth' : 'auto' });
+  function scrollToValue(el, value, smooth) {
+    el.scrollTo({ top: value * ITEM_H, behavior: smooth ? 'smooth' : 'auto' });
   }
-
-  function valueFromScroll(el) {
-    var items = el.querySelectorAll('.wheel-item');
-    var mid = el.scrollTop + el.clientHeight / 2;
-    var best = 0;
-    var bestDist = Infinity;
-    for (var i = 0; i < items.length; i++) {
-      var it = items[i];
-      var c = it.offsetTop + it.clientHeight / 2;
-      var d = Math.abs(c - mid);
-      if (d < bestDist) {
-        bestDist = d;
-        best = parseInt(it.getAttribute('data-v'), 10);
-      }
+  function readWheel(el) {
+    var idx = Math.round(el.scrollTop / ITEM_H);
+    var max = el.querySelectorAll('.wheel-item').length - 1;
+    if (idx < 0) idx = 0;
+    if (idx > max) idx = max;
+    return idx;
+  }
+  function syncPreview() {
+    var i = readWheel(document.getElementById('wheelInt'));
+    var d = readWheel(document.getElementById('wheelDec'));
+    if (i >= 10) {
+      i = 10;
+      d = 0;
     }
-    return best;
+    var v = i >= 10 ? 10 : i + d / 10;
+    document.getElementById('sheetPreview').textContent = v.toFixed(1);
   }
-
-  function updatePreview() {
-    // 10.x only allows .0
-    if (pickInt >= 10) {
-      pickDec = 0;
-      scrollToValue(wheelDec, 0, true);
-    }
-    var score = pickInt + pickDec / 10;
-    if (score > 10) score = 10;
-    previewScore.innerHTML = score.toFixed(1);
-  }
-
-  function onWheelScroll(which) {
-    if (syncingScroll) return;
-    if (which === 'int') {
-      pickInt = valueFromScroll(wheelInt);
-      if (pickInt >= 10) {
-        pickDec = 0;
-      }
-    } else {
-      pickDec = valueFromScroll(wheelDec);
-      if (pickInt >= 10) pickDec = 0;
-    }
-    updatePreview();
-  }
-
-  var scrollTimers = { int: null, dec: null };
-  function bindWheel(el, which) {
-    el.addEventListener('scroll', function () {
-      onWheelScroll(which);
-      clearTimeout(scrollTimers[which]);
-      scrollTimers[which] = setTimeout(function () {
-        // snap polish
-        var v = which === 'int' ? valueFromScroll(wheelInt) : valueFromScroll(wheelDec);
-        if (which === 'int') pickInt = v;
-        else pickDec = v;
-        if (pickInt >= 10) pickDec = 0;
-        syncingScroll = true;
-        scrollToValue(which === 'int' ? wheelInt : wheelDec, which === 'int' ? pickInt : pickDec, true);
-        if (pickInt >= 10) scrollToValue(wheelDec, 0, true);
-        updatePreview();
-        setTimeout(function () { syncingScroll = false; }, 120);
-      }, 80);
-    }, { passive: true });
-  }
-  bindWheel(wheelInt, 'int');
-  bindWheel(wheelDec, 'dec');
-
-  function openPicker(rowId) {
-    var row = findRow(rowId);
+  function openPicker(id) {
+    var row = null;
+    for (var i = 0; i < rows.length; i++) if (rows[i].id === id) row = rows[i];
     if (!row || row.isTotal) return;
-    pickerRowId = rowId;
-    sheetMeta.textContent = (row.category ? row.category + ' · ' : '') + row.item + ' · ' + (row.weight || 0) + '%';
-
+    editId = id;
+    document.getElementById('sheetSub').textContent =
+      (row.category ? row.category + ' · ' : '') + row.item + ' · ' + row.weight + '%';
+    var wi = document.getElementById('wheelInt');
+    var wd = document.getElementById('wheelDec');
+    buildWheel(wi, 10);
+    buildWheel(wd, 9);
     var v = row.value != null ? row.value : 0;
-    v = clampScore(v) || 0;
-    if (v >= 10) {
-      pickInt = 10;
-      pickDec = 0;
-    } else {
-      pickInt = Math.floor(v + 1e-9);
-      pickDec = Math.round((v - pickInt) * 10);
-      if (pickDec > 9) pickDec = 9;
-      if (pickDec < 0) pickDec = 0;
+    var ip = Math.min(10, Math.floor(v + 1e-9));
+    var dp = Math.round((v - ip) * 10);
+    if (ip >= 10) {
+      ip = 10;
+      dp = 0;
     }
-
-    overlay.hidden = false;
-    sheet.hidden = false;
-    // force reflow
-    void sheet.offsetHeight;
-    overlay.classList.add('open');
-    sheet.classList.add('open');
-    document.body.style.overflow = 'hidden';
-
+    var ov = document.getElementById('overlay');
+    var sh = document.getElementById('sheet');
+    ov.hidden = false;
+    sh.hidden = false;
     requestAnimationFrame(function () {
-      syncingScroll = true;
-      scrollToValue(wheelInt, pickInt, false);
-      scrollToValue(wheelDec, pickDec, false);
-      updatePreview();
-      setTimeout(function () { syncingScroll = false; }, 50);
+      ov.classList.add('open');
+      sh.classList.add('open');
+      scrollToValue(wi, ip, false);
+      scrollToValue(wd, dp, false);
+      syncPreview();
     });
   }
-
   function closePicker() {
-    overlay.classList.remove('open');
-    sheet.classList.remove('open');
-    document.body.style.overflow = '';
+    var ov = document.getElementById('overlay');
+    var sh = document.getElementById('sheet');
+    ov.classList.remove('open');
+    sh.classList.remove('open');
     setTimeout(function () {
-      if (!sheet.classList.contains('open')) {
-        overlay.hidden = true;
-        sheet.hidden = true;
-      }
-    }, 280);
-    pickerRowId = null;
+      ov.hidden = true;
+      sh.hidden = true;
+      editId = null;
+    }, 250);
   }
-
   function applyPicker(clear) {
-    if (!pickerRowId) return;
-    var row = findRow(pickerRowId);
+    if (!editId) return;
+    var row = null;
+    for (var i = 0; i < rows.length; i++) if (rows[i].id === editId) row = rows[i];
     if (!row) return;
-    if (clear) {
-      row.value = null;
-    } else {
-      var score = pickInt + pickDec / 10;
-      if (pickInt >= 10) score = 10;
-      row.value = clampScore(score);
+    if (clear) row.value = null;
+    else {
+      var i = readWheel(document.getElementById('wheelInt'));
+      var d = readWheel(document.getElementById('wheelDec'));
+      row.value = i >= 10 ? 10 : clampScore(i + d / 10);
     }
     closePicker();
     render();
   }
 
-  document.getElementById('sheet-ok').addEventListener('click', function () { applyPicker(false); });
-  document.getElementById('sheet-clear').addEventListener('click', function () { applyPicker(true); });
-  document.getElementById('sheet-cancel').addEventListener('click', closePicker);
-  document.getElementById('sheet-close').addEventListener('click', closePicker);
-  overlay.addEventListener('click', closePicker);
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && sheet.classList.contains('open')) closePicker();
+  // ---------- Events ----------
+  document.getElementById('fileCamera').addEventListener('change', function (e) {
+    onFiles(e.target.files);
+    e.target.value = '';
+  });
+  document.getElementById('fileGallery').addEventListener('change', function (e) {
+    onFiles(e.target.files);
+    e.target.value = '';
   });
 
-  // init
-  render();
+  var card = document.getElementById('ocrCard');
+  card.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    card.classList.add('drag');
+  });
+  card.addEventListener('dragleave', function () {
+    card.classList.remove('drag');
+  });
+  card.addEventListener('drop', function (e) {
+    e.preventDefault();
+    card.classList.remove('drag');
+    onFiles(e.dataTransfer.files);
+  });
+
+  document.getElementById('rawToggle').addEventListener('click', function () {
+    document.getElementById('rawBox').classList.toggle('show');
+  });
+
+  document.getElementById('marksBody').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-edit]');
+    if (b) openPicker(b.getAttribute('data-edit'));
+  });
+
+  document.getElementById('btnClearVals').addEventListener('click', function () {
+    rows.forEach(function (r) {
+      if (!r.isTotal) r.value = null;
+    });
+    render();
+  });
+  document.getElementById('btnReocr').addEventListener('click', function () {
+    document.getElementById('fileGallery').click();
+  });
+
+  document.getElementById('overlay').addEventListener('click', closePicker);
+  document.getElementById('sheetCancel').addEventListener('click', closePicker);
+  document.getElementById('sheetDone').addEventListener('click', function () {
+    applyPicker(false);
+  });
+  document.getElementById('sheetOk').addEventListener('click', function () {
+    applyPicker(false);
+  });
+  document.getElementById('sheetClear').addEventListener('click', function () {
+    applyPicker(true);
+  });
+
+  function onWheelScroll(el, key) {
+    if (snapTimers[key]) clearTimeout(snapTimers[key]);
+    snapTimers[key] = setTimeout(function () {
+      var idx = readWheel(el);
+      scrollToValue(el, idx, true);
+      if (key === 'int' && idx >= 10) scrollToValue(document.getElementById('wheelDec'), 0, true);
+      syncPreview();
+    }, 80);
+    syncPreview();
+  }
+  document.getElementById('wheelInt').addEventListener(
+    'scroll',
+    function () {
+      onWheelScroll(document.getElementById('wheelInt'), 'int');
+    },
+    { passive: true }
+  );
+  document.getElementById('wheelDec').addEventListener(
+    'scroll',
+    function () {
+      onWheelScroll(document.getElementById('wheelDec'), 'dec');
+    },
+    { passive: true }
+  );
+
+  // Paste image from clipboard (desktop)
+  document.addEventListener('paste', function (e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') === 0) {
+        var f = items[i].getAsFile();
+        if (f) {
+          e.preventDefault();
+          runOcr(f);
+        }
+        break;
+      }
+    }
+  });
 })();
   </script>
 </body>

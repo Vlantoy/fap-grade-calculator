@@ -12,8 +12,10 @@ Client-side tools for **FPT University Academic Portal (FAP)** students: estimat
 
 **Homepage:** https://vlantoy.github.io/fap-grade-calculator/  
 
-**What-if (zero-install, mobile wheel picker):**  
-https://vlantoy.github.io/fap-grade-calculator/what-if.html
+**What-if + OCR (zero-install):**  
+https://vlantoy.github.io/fap-grade-calculator/what-if.html  
+
+Upload / chụp ảnh Mark Details → Tesseract.js OCR (client-side) → bảng editable + number wheels.
 
 <p align="center">
   <img src="assets/demo-screenshot.png" alt="Demo: editable Value cells, Average 9.1, term GPA panel" width="900" />
@@ -94,7 +96,7 @@ fetch('https://raw.githubusercontent.com/Vlantoy/fap-grade-calculator/main/scrip
 ```text
 fap-grade-calculator/
 ├── index.html                          # Landing page (shows scripts live)
-├── what-if.html                        # Mark Details what-if + number wheels
+├── what-if.html                        # OCR screenshot → Mark Details + wheels
 ├── assets/
 │   ├── demo-screenshot.png             # Illustration / OG image
 │   ├── favicon.svg                     # Browser tab icon (calculator)
