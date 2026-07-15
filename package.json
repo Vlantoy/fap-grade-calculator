@@ -1,0 +1,13 @@
+{
+  "name": "fap-grade-calculator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FAP what-if grade calculator with Gemini Vision proxy on Vercel",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

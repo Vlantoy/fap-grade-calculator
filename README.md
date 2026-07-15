@@ -12,10 +12,11 @@ Client-side tools for **FPT University Academic Portal (FAP)** students: estimat
 
 **Homepage:** https://vlantoy.github.io/fap-grade-calculator/  
 
-**What-if + OCR (zero-install):**  
-https://vlantoy.github.io/fap-grade-calculator/what-if.html  
+**What-if + Vision (Gemini):**  
+- GitHub Pages (static): https://vlantoy.github.io/fap-grade-calculator/what-if.html  
+- **Vercel (key ẩn, khuyến nghị):** deploy repo này + set `GEMINI_API_KEY`
 
-Upload / chụp ảnh Mark Details → Tesseract.js OCR (client-side) → bảng editable + number wheels.
+Upload ảnh Mark Details → `/api/parse-grade` (Gemini Vision) → bảng editable + number wheels.
 
 <p align="center">
   <img src="assets/demo-screenshot.png" alt="Demo: editable Value cells, Average 9.1, term GPA panel" width="900" />
@@ -143,11 +144,39 @@ fap-grade-calculator/
 ```bash
 git clone https://github.com/Vlantoy/fap-grade-calculator.git
 cd fap-grade-calculator
-# open index.html locally, or use any static server
+```
+
+### Vercel (ẩn Gemini key)
+
+1. Import repo tại [vercel.com/new](https://vercel.com/new) (hoặc `npx vercel`).
+2. Project → **Settings → Environment Variables**:
+   - `GEMINI_API_KEY` = key Gemini (`AQ.…` hoặc `AIza…`) từ [Google AI Studio](https://aistudio.google.com/apikey)
+   - (optional) `GEMINI_MODEL` = `gemini-2.0-flash`
+3. Deploy. User mở `/what-if` → chọn ảnh → **không cần dán key**.
+
+API:
+
+```http
+POST /api/parse-grade
+Content-Type: application/json
+
+{ "imageBase64": "<base64 without data: prefix>", "mimeType": "image/jpeg" }
+```
+
+Local API:
+
+```bash
+npx vercel dev
+# set GEMINI_API_KEY in .env (gitignored)
+```
+
+### Static only
+
+```bash
 npx --yes serve .
 ```
 
-GitHub Pages serves the `main` branch root (`index.html`).
+GitHub Pages vẫn host landing + userscript; Vision proxy **cần Vercel** (hoặc host serverless khác).
 
 ---
 

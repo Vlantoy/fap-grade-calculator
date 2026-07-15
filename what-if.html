@@ -358,14 +358,13 @@
 
       <details class="keys-box" id="keysBox" style="margin-top:14px;text-align:left">
         <summary style="cursor:pointer;font-weight:700;color:#334155;font-size:0.9rem">
-          ⚙️ API Gemini (bắt buộc lần đầu)
+          ⚙️ Tuỳ chọn nâng cao (key riêng)
         </summary>
         <p style="font-size:0.8rem;color:#64748b;margin:8px 0">
-          Dán key Gemini (<code>AQ.…</code>) — mỗi dòng 1 key. Lưu trên máy (localStorage), không đẩy GitHub.
-          Hết quota tự xoay key.
+          Mặc định dùng server Vercel (không cần key). Chỉ dán key Gemini (<code>AQ.…</code>) nếu muốn gọi API trực tiếp / fallback.
         </p>
-        <textarea id="keysInput" rows="4" placeholder="AQ.xxxx&#10;AQ.yyyy" style="width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font:12px/1.4 ui-monospace,monospace"></textarea>
-        <button type="button" class="btn-big secondary" id="btnSaveKeys" style="margin-top:8px">Lưu key</button>
+        <textarea id="keysInput" rows="3" placeholder="AQ.xxxx (tuỳ chọn)" style="width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font:12px/1.4 ui-monospace,monospace"></textarea>
+        <button type="button" class="btn-big secondary" id="btnSaveKeys" style="margin-top:8px">Lưu key riêng</button>
         <div class="status" id="keysStatus" style="margin-top:6px"></div>
       </details>
     </section>
@@ -390,7 +389,7 @@
     </section>
 
     <p class="foot">
-      Ảnh gửi Gemini Vision (API) · key lưu localStorage ·
+      Ảnh → server Vercel (key ẩn) · fallback key riêng ·
       <a href="index.html">Trang chủ</a>
     </p>
   </main>
@@ -873,17 +872,14 @@
   }
   function refreshKeysUi() {
     var n = loadKeys().length;
-    var box = document.getElementById('keysBox');
     var st = document.getElementById('keysStatus');
     if (!st) return;
     if (n > 0) {
-      st.textContent = 'Đã lưu ' + n + ' key Gemini · hết quota sẽ xoay key.';
+      st.textContent = 'Đã lưu ' + n + ' key riêng (fallback).';
       st.className = 'status ok';
-      if (box) box.open = false;
     } else {
-      st.textContent = 'Chưa có key — dán key Gemini (AQ.…) rồi bấm Lưu key.';
-      st.className = 'status err';
-      if (box) box.open = true;
+      st.textContent = 'Không bắt buộc nếu đã deploy Vercel có GEMINI_API_KEY.';
+      st.className = 'status';
     }
   }
 
@@ -986,6 +982,25 @@
     return text;
   }
 
+  function applyParsedRows(parsed) {
+    if (!parsed || !parsed.length) throw new Error('parse-empty');
+    rows = parsed.map(function (r) {
+      return {
+        id: r.id || uid(),
+        category: r.category || '',
+        item: r.item,
+        weight: r.weight,
+        value: r.value == null ? null : r.value,
+        isTotal: !!r.isTotal,
+      };
+    });
+    setBar(100);
+    setStatus('Xong — ' + scorable().length + ' thành phần. Chạm 「Nhập」 để sửa.', 'ok');
+    render();
+    document.getElementById('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /** Ưu tiên proxy Vercel (key giấu server); fallback key riêng trên máy */
   async function runOcr(file) {
     var btn = document.getElementById('btnPick');
     btn.disabled = true;
@@ -994,8 +1009,54 @@
     thumb.classList.add('on');
 
     seedKeysFromWindow();
-    if (!loadKeys().length) {
-      setStatus('Chưa có Gemini key — mở ⚙️ bên dưới, dán key AQ.… rồi Lưu.', 'err');
+    setStatus('Đang chuẩn bị ảnh…', 'wait');
+    setBar(10);
+
+    var payload;
+    try {
+      var blob = await prepImage(file);
+      var useFile = blob instanceof Blob ? blob : file;
+      if (!(useFile instanceof File) && useFile instanceof Blob) {
+        useFile = new File([useFile], 'grade.jpg', { type: useFile.type || 'image/jpeg' });
+      }
+      payload = await fileToBase64(useFile);
+    } catch (e) {
+      payload = await fileToBase64(file);
+    }
+
+    // 1) Vercel proxy — không cần key trên client
+    setStatus('Đang đọc bảng điểm (server)…', 'wait');
+    setBar(40);
+    try {
+      var proxyRes = await fetch('/api/parse-grade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: payload.b64,
+          mimeType: payload.mime || 'image/jpeg',
+        }),
+      });
+      var proxyData = await proxyRes.json().catch(function () { return {}; });
+      if (proxyRes.ok && proxyData.rows && proxyData.rows.length) {
+        applyParsedRows(proxyData.rows);
+        btn.disabled = false;
+        return;
+      }
+      // 404/500 khi chạy local không có vercel dev → fallback key
+      if (proxyRes.status !== 404) {
+        console.warn('proxy', proxyRes.status, proxyData);
+      }
+    } catch (proxyErr) {
+      console.warn('proxy fail', proxyErr);
+    }
+
+    // 2) Fallback: key Gemini trên máy user
+    var keys = loadKeys();
+    if (!keys.length) {
+      setStatus(
+        'Server chưa sẵn sàng / lỗi. Mở ⚙️ dán key Gemini (AQ.…) để fallback, hoặc đợi deploy Vercel.',
+        'err'
+      );
       var box = document.getElementById('keysBox');
       if (box) box.open = true;
       btn.disabled = false;
@@ -1003,30 +1064,14 @@
       return;
     }
 
-    setStatus('Đang gửi ảnh cho Gemini…', 'wait');
-    setBar(15);
-
-    var payload;
-    try {
-      var blob = await prepImage(file);
-      var useFile = blob instanceof Blob ? blob : file;
-      if (!(useFile instanceof File) && useFile instanceof Blob) {
-        useFile = new File([useFile], 'grade.png', { type: useFile.type || 'image/png' });
-      }
-      payload = await fileToBase64(useFile);
-    } catch (e) {
-      payload = await fileToBase64(file);
-    }
-
-    setBar(35);
-    var keys = loadKeys();
-    var tries = Math.min(keys.length, 8);
+    setBar(55);
+    var tries = Math.min(keys.length, 6);
     var lastErr = null;
     for (var t = 0; t < tries; t++) {
       var picked = pickKey();
       if (!picked) break;
-      setStatus('Gemini đọc bảng… (key ' + (picked.index + 1) + '/' + picked.total + ')', 'wait');
-      setBar(40 + (t / tries) * 45);
+      setStatus('Fallback Gemini… (key ' + (picked.index + 1) + '/' + picked.total + ')', 'wait');
+      setBar(55 + (t / tries) * 40);
       try {
         var text = await callGeminiVision(payload.b64, payload.mime, picked.key);
         var parsed = [];
@@ -1036,12 +1081,7 @@
           parsed = parseText(text);
         }
         if (!parsed.length) parsed = parseText(text);
-        if (!parsed.length) throw new Error('parse-empty');
-        rows = parsed;
-        setBar(100);
-        setStatus('Xong — ' + scorable().length + ' thành phần. Chạm 「Nhập」 để sửa.', 'ok');
-        render();
-        document.getElementById('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        applyParsedRows(parsed);
         btn.disabled = false;
         return;
       } catch (err) {
@@ -1050,7 +1090,7 @@
       }
     }
     setStatus(
-      'Gemini lỗi: ' + (lastErr && lastErr.message ? lastErr.message : 'unknown') + ' — thử key/ảnh khác.',
+      'Lỗi đọc ảnh: ' + (lastErr && lastErr.message ? lastErr.message : 'unknown'),
       'err'
     );
     setBar(null);
