@@ -4,10 +4,19 @@
 [![GitHub Pages](https://img.shields.io/badge/docs-GitHub%20Pages-0ea5e9)](https://vlantoy.github.io/fap-grade-calculator/)
 [![FPT FAP](https://img.shields.io/badge/target-fap.fpt.edu.vn-22c55e)](https://fap.fpt.edu.vn/)
 
+<p align="center">
+  <img src="assets/favicon.svg" width="72" height="72" alt="FAP Grade Calculator icon" />
+</p>
+
 Client-side tools for **FPT University Academic Portal (FAP)** students: estimate course averages from grade components (weight × value), handle resit overrides, and optionally aggregate a term GPA — without writing anything back to FAP.
 
 **Homepage (script viewer + install):**  
 https://vlantoy.github.io/fap-grade-calculator/
+
+<p align="center">
+  <img src="assets/demo-screenshot.png" alt="Demo: editable Value cells, Average 9.1, term GPA panel" width="900" />
+</p>
+<p align="center"><em>Demo on FAP Mark Report — weighted Average + session GPA panel</em></p>
 
 > Not affiliated with FPT University. For personal what-if estimation only. Official grades always come from FAP.
 
@@ -69,6 +78,11 @@ fetch('https://raw.githubusercontent.com/Vlantoy/fap-grade-calculator/main/scrip
 ```text
 fap-grade-calculator/
 ├── index.html                          # Landing page (shows scripts live)
+├── assets/
+│   ├── demo-screenshot.png             # Illustration / OG image
+│   ├── favicon.svg                     # Browser tab icon (calculator)
+│   ├── favicon.ico
+│   └── favicon-*.png
 ├── scripts/
 │   ├── fap-grade-calculator.user.js    # Full Tampermonkey userscript
 │   └── fap-grade-mvp-console.js        # Console MVP (one course)

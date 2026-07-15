@@ -6,6 +6,16 @@
   <title>FAP Grade Calculator — FPT University</title>
   <meta name="description" content="Userscript & console MVP: nhập điểm Value trên FAP, tính Average theo weight, resit, GPA kỳ. Client-side only." />
   <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png" />
+  <link rel="apple-touch-icon" href="assets/favicon-32.png" />
+  <meta property="og:title" content="FAP Grade Calculator — FPT University" />
+  <meta property="og:description" content="Nhập Value trên FAP, tính Average theo weight, resit, GPA kỳ. Client-side only." />
+  <meta property="og:image" content="https://vlantoy.github.io/fap-grade-calculator/assets/demo-screenshot.png" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -59,9 +69,31 @@
     }
     .logo {
       width: 36px; height: 36px; border-radius: 10px;
-      background: linear-gradient(135deg, #0ea5e9, #22c55e);
-      display: grid; place-items: center;
-      font-weight: 800; color: #041016; font-size: 14px;
+      overflow: hidden;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(56,189,248,.35);
+    }
+    .logo img { width: 100%; height: 100%; display: block; }
+    .demo {
+      margin: 8px 0 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+    .demo img {
+      display: block;
+      width: 100%;
+      height: auto;
+      vertical-align: middle;
+    }
+    .demo figcaption {
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      background: rgba(15,23,42,.85);
     }
     nav { display: flex; gap: 10px; flex-wrap: wrap; }
     .btn {
@@ -221,7 +253,9 @@
   <div class="wrap">
     <header>
       <div class="brand">
-        <div class="logo">FG</div>
+        <div class="logo" aria-hidden="true">
+          <img src="assets/favicon.svg" width="36" height="36" alt="" />
+        </div>
         <div>FAP Grade Calculator</div>
       </div>
       <nav>
@@ -250,6 +284,20 @@
         <a class="btn" href="#script">Xem source script</a>
       </div>
     </section>
+
+    <figure class="demo" id="demo">
+      <img
+        src="assets/demo-screenshot.png"
+        width="1200"
+        height="700"
+        alt="Screenshot FAP Grade Calculator: bảng điểm có ô Value chỉnh được, Average 9.1, panel GPA kỳ session"
+        loading="eager"
+        decoding="async"
+      />
+      <figcaption>
+        Minh họa trên FAP: nhập Value → Average theo weight (resit = 0 không thay lần 1) · panel GPA kỳ (session) bên phải.
+      </figcaption>
+    </figure>
 
     <div class="grid">
       <div class="card">
