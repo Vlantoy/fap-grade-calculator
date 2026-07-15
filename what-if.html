@@ -294,8 +294,11 @@
     .col {
       width: 80px; height: var(--wheel-h);
       overflow-y: auto;
+      /* Browser snaps; JS không smooth-scroll lại (tránh vòng lặp) */
       scroll-snap-type: y mandatory;
+      scroll-behavior: auto;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
       scrollbar-width: none;
       mask-image: linear-gradient(#0000, #000 20%, #000 80%, #0000);
     }
@@ -309,8 +312,14 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 1.5rem; font-weight: 700; color: #94a3b8;
       scroll-snap-align: center;
+      scroll-snap-stop: always;
+      flex-shrink: 0;
     }
-    .pad { height: calc((var(--wheel-h) - var(--item-h)) / 2); }
+    .pad {
+      height: calc((var(--wheel-h) - var(--item-h)) / 2);
+      flex-shrink: 0;
+      scroll-snap-align: none;
+    }
     .sheet .btns {
       display: flex; gap: 10px;
       padding: 8px 16px 16px;
@@ -403,7 +412,8 @@
 
   var rows = [];
   var editId = null;
-  var timers = { i: null, d: null };
+  /** true khi JS đang set scrollTop (mở picker) — bỏ qua handler scroll */
+  var wheelProgrammatic = false;
 
   function uid() { return 'r' + Math.random().toString(36).slice(2, 9); }
   function isResit(s) { return RESIT_RE.test(s || ''); }
@@ -715,23 +725,40 @@
     btn.disabled = false;
   }
 
-  /* ---- wheel ---- */
+  /* ---- wheel ----
+   * Nguyên lý đúng:
+   * - Dừng / snap = CSS scroll-snap (browser), KHÔNG tự smooth-scroll trong handler scroll
+   * - Handler scroll chỉ cập nhật số preview
+   * - Chỉ set scrollTop khi MỞ picker (instant), có cờ chặn loop
+   */
   function buildCol(el, max) {
     var h = '<div class="pad"></div>';
     for (var i = 0; i <= max; i++) h += '<div class="it" data-v="' + i + '">' + i + '</div>';
     h += '<div class="pad"></div>';
     el.innerHTML = h;
   }
-  function scrollTo(el, v, smooth) {
+
+  /** Instant jump — never behavior:smooth here */
+  function jumpTo(el, v) {
     var it = el.querySelector('.it[data-v="' + v + '"]');
     if (!it) return;
     var top = it.offsetTop - (el.clientHeight - it.clientHeight) / 2;
-    el.scrollTo({ top: top, behavior: smooth ? 'smooth' : 'auto' });
+    wheelProgrammatic = true;
+    el.scrollTop = top;
+    // nhả cờ sau 1–2 frame (sau khi browser fire scroll event từ assignment)
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        wheelProgrammatic = false;
+      });
+    });
   }
+
   function readCol(el) {
     var items = el.querySelectorAll('.it');
+    if (!items.length) return 0;
     var mid = el.scrollTop + el.clientHeight / 2;
-    var best = 0, dist = 1e9;
+    var best = 0;
+    var dist = 1e9;
     for (var i = 0; i < items.length; i++) {
       var c = items[i].offsetTop + items[i].clientHeight / 2;
       var d = Math.abs(c - mid);
@@ -742,13 +769,27 @@
     }
     return best;
   }
+
   function preview() {
     var i = readCol(document.getElementById('wInt'));
     var d = readCol(document.getElementById('wDec'));
     if (i >= 10) d = 0;
     var v = i >= 10 ? 10 : i + d / 10;
     document.getElementById('sheetBig').textContent = v.toFixed(1);
+    // highlight item gần tâm
+    highlightCol(document.getElementById('wInt'), i);
+    highlightCol(document.getElementById('wDec'), d);
   }
+
+  function highlightCol(el, active) {
+    var items = el.querySelectorAll('.it');
+    for (var i = 0; i < items.length; i++) {
+      var v = parseInt(items[i].getAttribute('data-v'), 10);
+      items[i].style.color = v === active ? '#0f172a' : '';
+      items[i].style.fontSize = v === active ? '1.75rem' : '';
+    }
+  }
+
   function openPick(id) {
     var row = null;
     for (var i = 0; i < rows.length; i++) if (rows[i].id === id) row = rows[i];
@@ -769,17 +810,20 @@
     }
     document.getElementById('mask').classList.add('on');
     document.getElementById('sheet').classList.add('on');
+    // đợi layout pad/item xong rồi nhảy tức thì
     requestAnimationFrame(function () {
-      scrollTo(wi, ip, false);
-      scrollTo(wd, dp, false);
+      jumpTo(wi, ip);
+      jumpTo(wd, dp);
       preview();
     });
   }
+
   function closePick() {
     document.getElementById('mask').classList.remove('on');
     document.getElementById('sheet').classList.remove('on');
     editId = null;
   }
+
   function apply(clear) {
     if (!editId) return;
     var row = null;
@@ -787,9 +831,9 @@
     if (!row) return;
     if (clear) row.value = null;
     else {
-      var i = readCol(document.getElementById('wInt'));
-      var d = readCol(document.getElementById('wDec'));
-      row.value = i >= 10 ? 10 : clamp(i + d / 10);
+      var iv = readCol(document.getElementById('wInt'));
+      var dv = readCol(document.getElementById('wDec'));
+      row.value = iv >= 10 ? 10 : clamp(iv + dv / 10);
     }
     closePick();
     render();
@@ -825,24 +869,34 @@
     apply(true);
   });
 
-  function bindScroll(el, key) {
+  // Chỉ update preview — KHÔNG gọi scrollTo trong handler (tránh cuộn mãi không dừng)
+  function bindScroll(el) {
     el.addEventListener(
       'scroll',
       function () {
+        if (wheelProgrammatic) return;
         preview();
-        clearTimeout(timers[key]);
-        timers[key] = setTimeout(function () {
-          var v = readCol(el);
-          scrollTo(el, v, true);
-          if (key === 'i' && v >= 10) scrollTo(document.getElementById('wDec'), 0, true);
-          preview();
-        }, 90);
+      },
+      { passive: true }
+    );
+    // Khi browser snap xong (nếu hỗ trợ)
+    el.addEventListener(
+      'scrollend',
+      function () {
+        if (wheelProgrammatic) return;
+        preview();
+        // Khóa thập phân nếu nguyên = 10 (không animate)
+        var wi = document.getElementById('wInt');
+        if (el === wi && readCol(wi) >= 10) {
+          var wd = document.getElementById('wDec');
+          if (readCol(wd) !== 0) jumpTo(wd, 0);
+        }
       },
       { passive: true }
     );
   }
-  bindScroll(document.getElementById('wInt'), 'i');
-  bindScroll(document.getElementById('wDec'), 'd');
+  bindScroll(document.getElementById('wInt'));
+  bindScroll(document.getElementById('wDec'));
 
   document.addEventListener('paste', function (e) {
     var items = e.clipboardData && e.clipboardData.items;
