@@ -1,19 +1,21 @@
 /**
  * FAP Grade MVP — Console one-shot
  * Chỉ tính điểm trung bình CÓ TRỌNG SỐ của 1 môn đang mở.
+ * Tự reset sau TTL_MS (mặc định 3 phút) — như chưa từng tính.
  *
  * Cách dùng:
  * 1. Mở FAP → Mark Report → chọn 1 môn (StudentGrade.aspx?course=...)
  * 2. F12 → Console
  * 3. Dán toàn bộ file này → Enter
  * 4. Gõ điểm vào ô Value → Average tự cập nhật
- * 5. F5 = mất (không lưu)
+ * 5. Hết 3 phút / F5 = mất
  *
  * Không GPA kỳ, không session, không overlay.
  */
 (function fapGradeMVP() {
   'use strict';
 
+  var TTL_MS = 3 * 60 * 1000; // 3 phút
   var WEIGHT_RE = /(\d+(?:[.,]\d+)?)\s*[%％]/;
   var RESIT_RE = /\bresit\b|thi\s*lại|thi\s*lai|retake|học\s*lại|hoc\s*lai/i;
 
@@ -84,6 +86,10 @@
 
   var components = [];
   var avgTd = null;
+  var snapshots = [];
+  var avgSnap = null;
+  var expiresAt = Date.now() + TTL_MS;
+  var dead = false;
 
   for (var r = 0; r < table.rows.length; r++) {
     var tr = table.rows[r];
@@ -116,6 +122,7 @@
       var existing = parseScore(text(valTd));
       var inp = valTd.querySelector('input[data-fap-mvp]');
       if (!inp) {
+        snapshots.push({ el: valTd, html: valTd.innerHTML });
         valTd.textContent = '';
         inp = document.createElement('input');
         inp.type = 'text';
@@ -149,7 +156,24 @@
     return v == null ? null : clamp(v);
   }
 
+  function teardown() {
+    if (dead) return;
+    dead = true;
+    var i;
+    for (i = 0; i < snapshots.length; i++) {
+      if (snapshots[i].el && snapshots[i].el.isConnected) {
+        snapshots[i].el.innerHTML = snapshots[i].html;
+      }
+    }
+    if (avgSnap && avgSnap.el && avgSnap.el.isConnected) {
+      avgSnap.el.innerHTML = avgSnap.html;
+    }
+    console.log('[FAP MVP] Đã reset sau', TTL_MS / 60000, 'phút — như chưa tính');
+  }
+
   function recalc() {
+    if (dead) return null;
+    expiresAt = Date.now() + TTL_MS; // gõ lại = gia hạn
     var resitOn = {};
     var i;
     for (i = 0; i < components.length; i++) {
@@ -183,13 +207,23 @@
     components[k].input.onchange = recalc;
   }
 
+  setInterval(function () {
+    if (!dead && Date.now() >= expiresAt) teardown();
+  }, 1000);
+  setTimeout(function () {
+    if (!dead) teardown();
+  }, TTL_MS);
+
   var result = recalc();
   window.fapGradeMVP = fapGradeMVP;
+  window.fapGradeMVPReset = teardown;
   console.log(
     '[FAP MVP] Ready —',
     components.length,
-    'ô Value. Average hiện tại:',
+    'ô · Average:',
     result.toFixed(1),
-    '| Gõ lại: fapGradeMVP()'
+    '· tự reset sau',
+    TTL_MS / 60000,
+    'phút · fapGradeMVPReset() để xóa ngay'
   );
 })();

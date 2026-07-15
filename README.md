@@ -30,7 +30,10 @@ https://vlantoy.github.io/fap-grade-calculator/
 | Weighted average → **Average** row | Yes | Yes |
 | **Resit** replaces 1st attempt of same component | Yes | Yes |
 | Session store + **term GPA** panel | Yes | No |
+| **Auto-reset** after idle TTL (default **3 min**) | Yes | Yes |
 | No install (paste in DevTools) | — | Yes |
+
+After the TTL (or closing the GPA panel with **×**), inputs are removed, Average/original cells are restored, and session data is cleared — as if the tool never ran. Typing again extends the TTL.
 
 ### Formula
 

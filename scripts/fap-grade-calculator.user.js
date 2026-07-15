@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         FAP Grade Calculator + GPA kỳ
 // @namespace    https://github.com/Vlantoy/fap-grade-calculator
-// @version      10.0.0
-// @description  Nhập Value trên FAP StudentGrade, tính Average theo weight (resit thay lần 1), lưu session và hiện GPA kỳ. Client-side only.
+// @version      11.0.0
+// @description  Tính điểm FAP tạm thời (mặc định 3 phút rồi tự reset). Weight + resit + GPA session ngắn hạn. Client-side only.
 // @author       Vlantoy
 // @homepageURL  https://vlantoy.github.io/fap-grade-calculator/
 // @supportURL   https://github.com/Vlantoy/fap-grade-calculator/issues
@@ -17,10 +17,21 @@
 (function () {
   'use strict';
 
+  // ===== Cấu hình thời gian sống (ms) — hết giờ = như chưa từng tính =====
+  var TTL_MS = 3 * 60 * 1000; // 3 phút
+
   var WEIGHT_RE = /(\d+(?:[.,]\d+)?)\s*[%％]/;
   var RESIT_RE = /\bresit\b|thi\s*lại|thi\s*lai|retake|học\s*lại|hoc\s*lai/i;
-  var STORE_KEY = 'fap_grade_calc_session_v1';
+  var STORE_KEY = 'fap_grade_calc_session_v2';
   var PANEL_ID = 'fap-gpa-panel';
+  var EXPIRES_KEY = 'fap_grade_calc_expires_at';
+
+  var sessionExpiresAt = 0;
+  var ttlTimer = null;
+  var countdownTimer = null;
+  var teardownDone = false;
+  var restoreSnapshots = []; // { el, html }
+  var avgSnapshot = null; // { el, html }
 
   // ---------- helpers ----------
   function T(el) {
@@ -75,7 +86,6 @@
     if (m >= 4) return 'D';
     return 'F';
   }
-  /** Điểm chữ → thang 4 (FPT) */
   function gpaPoint(m) {
     if (m == null || !isFinite(m) || m < 4) return 0;
     if (m >= 9) return 4.0;
@@ -88,7 +98,6 @@
     if (m >= 4) return 1.0;
     return 0;
   }
-
   function qs(name) {
     try {
       return new URL(location.href).searchParams.get(name) || '';
@@ -96,17 +105,34 @@
       return '';
     }
   }
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, '&quot;');
+  }
+  function fmtRemain(ms) {
+    if (ms <= 0) return '0:00';
+    var s = Math.ceil(ms / 1000);
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
 
+  // ---------- short-lived store ----------
   function loadStore() {
     try {
       var raw = sessionStorage.getItem(STORE_KEY);
-      if (!raw) return { courses: {} };
+      if (!raw) return { courses: {}, expiresAt: 0 };
       var o = JSON.parse(raw);
-      if (!o || typeof o !== 'object') return { courses: {} };
+      if (!o || typeof o !== 'object') return { courses: {}, expiresAt: 0 };
       if (!o.courses) o.courses = {};
       return o;
     } catch (e) {
-      return { courses: {} };
+      return { courses: {}, expiresAt: 0 };
     }
   }
   function saveStore(o) {
@@ -114,12 +140,135 @@
       sessionStorage.setItem(STORE_KEY, JSON.stringify(o));
     } catch (e) {}
   }
-
+  function clearStore() {
+    try {
+      sessionStorage.removeItem(STORE_KEY);
+      sessionStorage.removeItem(EXPIRES_KEY);
+    } catch (e) {}
+  }
   function courseKey(term, courseId) {
     return String(term || '') + '|' + String(courseId || '');
   }
 
-  // ---------- UI panel GPA (trang tổng + trang môn) ----------
+  function purgeIfExpired() {
+    var now = Date.now();
+    var store = loadStore();
+    var exp = store.expiresAt || parseInt(sessionStorage.getItem(EXPIRES_KEY) || '0', 10) || 0;
+    if (exp && now >= exp) {
+      clearStore();
+      return true;
+    }
+    // Xóa môn quá TTL kể từ updated
+    var changed = false;
+    var k;
+    for (k in store.courses) {
+      if (!Object.prototype.hasOwnProperty.call(store.courses, k)) continue;
+      var c = store.courses[k];
+      if (!c || !c.updated || now - c.updated > TTL_MS) {
+        delete store.courses[k];
+        changed = true;
+      }
+    }
+    if (changed) saveStore(store);
+    return false;
+  }
+
+  /** Gia hạn / khởi tạo thời điểm hết hạn cho cả session tính điểm */
+  function touchExpiry() {
+    var now = Date.now();
+    if (!sessionExpiresAt || sessionExpiresAt < now) {
+      sessionExpiresAt = now + TTL_MS;
+    }
+    // Mỗi lần tương tác: reset TTL (vài phút kể từ lần gõ cuối)
+    sessionExpiresAt = now + TTL_MS;
+    try {
+      sessionStorage.setItem(EXPIRES_KEY, String(sessionExpiresAt));
+    } catch (e) {}
+    var st = loadStore();
+    st.expiresAt = sessionExpiresAt;
+    saveStore(st);
+    scheduleTeardown();
+    updateCountdownUi();
+  }
+
+  function remainingMs() {
+    if (!sessionExpiresAt) {
+      var exp = parseInt(sessionStorage.getItem(EXPIRES_KEY) || '0', 10) || 0;
+      sessionExpiresAt = exp;
+    }
+    return Math.max(0, (sessionExpiresAt || 0) - Date.now());
+  }
+
+  // ---------- teardown: trở về như chưa tính ----------
+  function teardown(reason) {
+    if (teardownDone) return;
+    teardownDone = true;
+    if (ttlTimer) clearTimeout(ttlTimer);
+    if (countdownTimer) clearInterval(countdownTimer);
+    ttlTimer = null;
+    countdownTimer = null;
+
+    // Gỡ input, khôi phục HTML gốc
+    var i;
+    for (i = 0; i < restoreSnapshots.length; i++) {
+      var snap = restoreSnapshots[i];
+      if (snap.el && snap.el.isConnected) {
+        snap.el.innerHTML = snap.html;
+      }
+    }
+    restoreSnapshots = [];
+    if (avgSnapshot && avgSnapshot.el && avgSnapshot.el.isConnected) {
+      avgSnapshot.el.innerHTML = avgSnapshot.html;
+    }
+    avgSnapshot = null;
+
+    // Gỡ mọi input sót
+    var leftovers = document.querySelectorAll('input[data-fap-calc]');
+    for (i = 0; i < leftovers.length; i++) {
+      var parent = leftovers[i].parentNode;
+      if (parent) parent.textContent = leftovers[i].getAttribute('data-orig') || '';
+    }
+
+    // Gỡ badge inline + panel
+    var badges = document.querySelectorAll('.fap-inline-avg');
+    for (i = 0; i < badges.length; i++) badges[i].remove();
+    var panel = document.getElementById(PANEL_ID);
+    if (panel) panel.remove();
+
+    clearStore();
+    console.log('[FAP Calc] Đã reset —', reason || 'hết thời gian', '— như chưa từng tính');
+  }
+
+  function scheduleTeardown() {
+    if (ttlTimer) clearTimeout(ttlTimer);
+    var left = remainingMs();
+    if (left <= 0) {
+      teardown('hết TTL');
+      return;
+    }
+    ttlTimer = setTimeout(function () {
+      teardown('hết ' + TTL_MS / 60000 + ' phút');
+    }, left);
+    if (!countdownTimer) {
+      countdownTimer = setInterval(function () {
+        if (remainingMs() <= 0) {
+          teardown('hết TTL');
+          return;
+        }
+        updateCountdownUi();
+      }, 1000);
+    }
+  }
+
+  function updateCountdownUi() {
+    var el = document.getElementById('fap-gpa-ttl');
+    if (!el) return;
+    var left = remainingMs();
+    el.textContent = 'Tự xóa sau ' + fmtRemain(left);
+    el.style.color = left < 60000 ? '#fbbf24' : '#9ca3af';
+  }
+
+  // ---------- UI panel GPA ----------
   function ensurePanel() {
     var p = document.getElementById(PANEL_ID);
     if (p) return p;
@@ -143,19 +292,26 @@
       ].join(';')
     );
     p.innerHTML =
-      '<div style="padding:8px 12px;background:#1f2937;font-weight:700;display:flex;justify-content:space-between;align-items:center">' +
-      '<span>GPA kỳ (session)</span>' +
-      '<button type="button" id="fap-gpa-x" style="border:0;background:0;color:#9ca3af;cursor:pointer;font-size:16px">×</button>' +
+      '<div style="padding:8px 12px;background:#1f2937;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+      '<span>GPA kỳ <span style="font-weight:500;font-size:11px;color:#9ca3af">(tạm)</span></span>' +
+      '<button type="button" id="fap-gpa-x" style="border:0;background:0;color:#9ca3af;cursor:pointer;font-size:16px" title="Đóng & xóa ngay">×</button>' +
       '</div>' +
+      '<div id="fap-gpa-ttl" style="padding:4px 12px 0;font-size:11px;color:#9ca3af"></div>' +
       '<div id="fap-gpa-body" style="padding:10px 12px"></div>';
     document.body.appendChild(p);
     p.querySelector('#fap-gpa-x').onclick = function () {
-      p.remove();
+      teardown('user đóng panel');
     };
     return p;
   }
 
   function renderGpaPanel(termFilter) {
+    if (teardownDone) return;
+    if (purgeIfExpired()) {
+      teardown('session hết hạn');
+      return;
+    }
+
     var store = loadStore();
     var list = [];
     var k;
@@ -171,22 +327,26 @@
     });
 
     ensurePanel();
+    updateCountdownUi();
     var body = document.getElementById('fap-gpa-body');
     if (!body) return;
 
     if (!list.length) {
       body.innerHTML =
         '<div style="color:#9ca3af;font-size:12px">' +
-        'Chưa có môn nào trong session.<br>' +
-        'Vào từng môn → nhập Value → Average được lưu.<br>' +
-        'Quay lại trang này (không đóng tab) để xem GPA.' +
+        'Chưa có môn trong phiên tạm.<br>' +
+        'Vào từng môn → nhập Value.<br>' +
+        '<b style="color:#fbbf24">Tự xóa sau ' +
+        TTL_MS / 60000 +
+        ' phút</b> không dùng / hoặc bấm ×.' +
         '</div>';
       return;
     }
 
     var sum10 = 0;
     var sum4 = 0;
-    var html = '<div style="margin-bottom:8px;font-size:12px;color:#9ca3af">Kỳ: ' +
+    var html =
+      '<div style="margin-bottom:8px;font-size:12px;color:#9ca3af">Kỳ: ' +
       (termFilter || list[0].term || '—') +
       ' · ' +
       list.length +
@@ -222,21 +382,13 @@
       avg4.toFixed(2) +
       '</b></div>' +
       '<div style="margin-top:8px;font-size:11px;color:#6b7280">' +
-      'Công thức: trung bình cộng điểm TB các môn đã lưu.<br>' +
-      'Đóng tab / hết session = mất. F5 trong tab vẫn giữ.' +
+      'Phiên tạm · hết giờ = reset như chưa tính.<br>' +
+      'Gõ điểm lại = gia hạn thêm ' +
+      TTL_MS / 60000 +
+      ' phút.' +
       '</div></div>';
 
     body.innerHTML = html;
-  }
-
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
-  function escapeAttr(s) {
-    return escapeHtml(s).replace(/"/g, '&quot;');
   }
 
   // ---------- Trang chi tiết 1 môn ----------
@@ -251,25 +403,22 @@
   }
 
   function guessCourseName() {
-    // caption / h2 / title
     var cap = document.querySelector('#ctl00_mainContent_divGrade caption, [id$="divGrade"] caption');
     if (cap && T(cap)) return T(cap).replace(/\s*then see report.*/i, '').trim();
     var h2 = document.querySelector('#ctl00_mainContent_divGrade h2, [id$="divGrade"] h2, h2');
     if (h2 && T(h2).length > 2 && T(h2).length < 120) return T(h2);
-    // link đang chọn
     var sel = document.querySelector('a[href*="course="].active, select option:checked');
     if (sel && T(sel)) return T(sel);
     return qs('course') || 'Course';
   }
 
   function wireCourseDetail() {
+    if (teardownDone) return false;
+    if (purgeIfExpired()) return false;
+
     var table = getGradeTable();
     if (!table || !table.rows || table.rows.length < 2) return false;
-    // Đã gắn?
-    if (document.querySelector('input[data-fap-calc]')) {
-      // vẫn refresh panel
-      return true;
-    }
+    if (document.querySelector('input[data-fap-calc]')) return true;
 
     var term = qs('term');
     var courseId = qs('course');
@@ -277,11 +426,11 @@
     var components = [];
     var avgTd = null;
 
-    // Restore values từ session
     var store = loadStore();
+    // Chỉ restore value nếu session còn hạn
     var ck = courseKey(term, courseId);
     var saved = store.courses[ck] || null;
-    var savedValues = (saved && saved.values) || {};
+    var savedValues = saved && saved.values && Date.now() - (saved.updated || 0) < TTL_MS ? saved.values : {};
 
     for (var r = 0; r < table.rows.length; r++) {
       var tr = table.rows[r];
@@ -311,6 +460,9 @@
         var valTd = cells[c + 1];
         if (!valTd || parseWeight(T(valTd)) != null) continue;
 
+        var origHtml = valTd.innerHTML;
+        restoreSnapshots.push({ el: valTd, html: origHtml });
+
         var existing = parseScore(T(valTd));
         var inp = document.createElement('input');
         inp.type = 'text';
@@ -319,8 +471,8 @@
         inp.setAttribute('data-name', itemName);
         inp.setAttribute('data-resit', isResitName(itemName) ? '1' : '0');
         inp.setAttribute('data-key', baseKey(itemName));
+        inp.setAttribute('data-orig', existing != null ? String(existing) : '');
 
-        // Ưu tiên: điểm FAP có sẵn → session đã nhập → trống
         if (existing != null) {
           inp.value = String(existing);
         } else if (savedValues[itemName] != null && savedValues[itemName] !== '') {
@@ -348,6 +500,10 @@
 
     if (!components.length) return false;
 
+    if (avgTd) {
+      avgSnapshot = { el: avgTd, html: avgTd.innerHTML };
+    }
+
     function readVal(inp) {
       var raw = String(inp.value || '').trim();
       if (raw === '') return null;
@@ -356,6 +512,9 @@
     }
 
     function recalc() {
+      if (teardownDone) return;
+      touchExpiry();
+
       var resitActive = {};
       var i;
       for (i = 0; i < components.length; i++) {
@@ -389,11 +548,11 @@
         avgTd.textContent = avg.toFixed(1);
       }
 
-      // Lưu session — để trang tổng quát tính GPA (không cần reload)
       if (courseId) {
         var st = loadStore();
         st.rollNumber = roll || st.rollNumber;
         st.term = term || st.term;
+        st.expiresAt = sessionExpiresAt;
         st.courses[courseKey(term, courseId)] = {
           id: courseId,
           term: term,
@@ -415,25 +574,21 @@
       components[k].input.oninput = recalc;
       components[k].input.onchange = recalc;
     }
-    recalc();
-    console.log('[FAP Calc] course detail OK', components.length);
-    return true;
-  }
 
-  // ---------- Trang tổng quát (danh sách môn / chưa chọn course) ----------
-  function isOverviewPage() {
-    var path = (location.pathname || '').toLowerCase();
-    if (!/studentgrade|grade\//i.test(path)) return false;
-    // Có bảng Report chi tiết 1 môn → không phải overview thuần
-    var table = getGradeTable();
-    if (table && table.querySelector('td') && WEIGHT_RE.test(T(table)) && qs('course')) {
-      return false;
-    }
+    touchExpiry();
+    recalc();
+    console.log(
+      '[FAP Calc] OK',
+      components.length,
+      'ô · tự reset sau',
+      TTL_MS / 60000,
+      'phút không dùng'
+    );
     return true;
   }
 
   function scrapeOverviewLinks() {
-    // Gắn TB đã lưu cạnh link môn nếu có
+    if (teardownDone) return;
     var store = loadStore();
     var term = qs('term') || store.term || '';
     var links = document.querySelectorAll('a[href*="StudentGrade.aspx"], a[href*="course="]');
@@ -457,25 +612,35 @@
   }
 
   function bootOverview() {
+    if (purgeIfExpired()) return;
+    var exp = parseInt(sessionStorage.getItem(EXPIRES_KEY) || '0', 10) || 0;
+    if (exp > Date.now()) {
+      sessionExpiresAt = exp;
+      scheduleTeardown();
+    } else if (Object.keys(loadStore().courses || {}).length) {
+      // có data cũ không hạn → xóa
+      clearStore();
+      return;
+    } else {
+      return; // không có gì để hiện
+    }
     var term = qs('term') || loadStore().term || '';
     renderGpaPanel(term);
     scrapeOverviewLinks();
-    // Cập nhật khi quay lại tab / focus (đổi môn rồi back)
     window.addEventListener('focus', function () {
+      if (teardownDone) return;
+      if (purgeIfExpired()) {
+        teardown('hết hạn khi focus');
+        return;
+      }
       renderGpaPanel(qs('term') || loadStore().term || '');
       scrapeOverviewLinks();
     });
-    document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) {
-        renderGpaPanel(qs('term') || loadStore().term || '');
-        scrapeOverviewLinks();
-      }
-    });
-    console.log('[FAP Calc] overview GPA panel');
   }
 
-  // ---------- boot ----------
   function boot() {
+    purgeIfExpired();
+
     var course = qs('course');
     var table = getGradeTable();
     var hasDetail = table && WEIGHT_RE.test(T(table)) && course;
@@ -486,14 +651,9 @@
         n++;
         if (wireCourseDetail() || n > 40) clearInterval(t);
       }, 400);
-      // panel GPA vẫn hiện cạnh trang môn
-      setTimeout(function () {
-        renderGpaPanel(qs('term'));
-      }, 600);
       return;
     }
 
-    // overview / chọn môn
     bootOverview();
   }
 
