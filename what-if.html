@@ -355,6 +355,19 @@
       <div class="status" id="status"></div>
       <div class="bar" id="bar"><i id="barFill"></i></div>
       <img class="thumb" id="thumb" alt="" />
+
+      <details class="keys-box" id="keysBox" style="margin-top:14px;text-align:left">
+        <summary style="cursor:pointer;font-weight:700;color:#334155;font-size:0.9rem">
+          ⚙️ API Gemini (bắt buộc lần đầu)
+        </summary>
+        <p style="font-size:0.8rem;color:#64748b;margin:8px 0">
+          Dán key Gemini (<code>AQ.…</code>) — mỗi dòng 1 key. Lưu trên máy (localStorage), không đẩy GitHub.
+          Hết quota tự xoay key.
+        </p>
+        <textarea id="keysInput" rows="4" placeholder="AQ.xxxx&#10;AQ.yyyy" style="width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font:12px/1.4 ui-monospace,monospace"></textarea>
+        <button type="button" class="btn-big secondary" id="btnSaveKeys" style="margin-top:8px">Lưu key</button>
+        <div class="status" id="keysStatus" style="margin-top:6px"></div>
+      </details>
     </section>
 
     <section class="panel" id="panel">
@@ -377,7 +390,7 @@
     </section>
 
     <p class="foot">
-      Ảnh xử lý trên máy bạn · không gửi server ·
+      Ảnh gửi Gemini Vision (API) · key lưu localStorage ·
       <a href="index.html">Trang chủ</a>
     </p>
   </main>
@@ -399,15 +412,16 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- optional local seed (gitignored): window.__FAP_GEMINI_KEYS__ = ['AQ...'] -->
+  <script src="what-if-keys.seed.js" onerror=""></script>
   <script>
 (function () {
   'use strict';
 
-  // OCR: vie+eng (Tesseract.js) — vie hỗ trợ dấu tiếng Việt tốt hơn eng-only
-  var OCR_LANG = 'vie+eng';
-  var ocrWorker = null;
-  var ocrWorkerReady = null;
+  // Gemini Vision (key AQ.*) — thay Tesseract
+  var GEMINI_MODEL = 'gemini-2.0-flash';
+  var KEYS_LS = 'fap_gemini_keys_v1';
+  var KEY_IDX_LS = 'fap_gemini_key_idx_v1';
 
   var RESIT_RE = /\bresit\b|thi\s*l[aạ]i|retake|h[oọ]c\s*l[aạ]i/i;
   var HEADER_RE =
@@ -784,8 +798,7 @@
   }
 
   /**
-   * Crop: Grade item + Weight + Value
-   * (bỏ status bar / nav / bớt cột category trái — GIỮ cột Value phải)
+   * Gemini Vision: giữ màu tự nhiên, chỉ resize + crop chrome nhẹ (không binary như Tesseract).
    */
   function prepImage(file) {
     return new Promise(function (resolve) {
@@ -795,20 +808,12 @@
         try {
           var iw = img.width;
           var ih = img.height;
-          // trái: bớt category; phải: giữ value; trên/dưới: bỏ chrome app
-          var sx = Math.round(iw * 0.14);
-          var sy = Math.round(ih * 0.09);
-          var sw = Math.round(iw * 0.8); // item + weight + value
-          var sh = Math.round(ih * 0.8);
-          if (sw < 100 || sh < 100) {
-            sx = 0;
-            sy = 0;
-            sw = iw;
-            sh = ih;
-          }
-
-          var maxW = 1200;
-          var scale = sw > maxW ? maxW / sw : sw < 700 ? Math.min(2.2, 900 / sw) : 1;
+          var sx = Math.round(iw * 0.04);
+          var sy = Math.round(ih * 0.06);
+          var sw = Math.round(iw * 0.92);
+          var sh = Math.round(ih * 0.86);
+          var maxW = 1600;
+          var scale = sw > maxW ? maxW / sw : 1;
           var w = Math.round(sw * scale);
           var h = Math.round(sh * scale);
           var c = document.createElement('canvas');
@@ -818,24 +823,14 @@
           ctx.fillStyle = '#fff';
           ctx.fillRect(0, 0, w, h);
           ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-
-          var id = ctx.getImageData(0, 0, w, h);
-          var d = id.data;
-          for (var i = 0; i < d.length; i += 4) {
-            var g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-            g = (g - 128) * 1.45 + 128;
-            if (g < 0) g = 0;
-            if (g > 255) g = 255;
-            // hơi binary để chữ item rõ
-            if (g > 175) g = 255;
-            else if (g < 90) g = 0;
-            d[i] = d[i + 1] = d[i + 2] = g;
-          }
-          ctx.putImageData(id, 0, 0);
           URL.revokeObjectURL(url);
-          c.toBlob(function (b) {
-            resolve(b || file);
-          }, 'image/png');
+          c.toBlob(
+            function (b) {
+              resolve(b || file);
+            },
+            'image/jpeg',
+            0.9
+          );
         } catch (e) {
           URL.revokeObjectURL(url);
           resolve(file);
@@ -849,46 +844,146 @@
     });
   }
 
-  /**
-   * Worker vie+eng — tái dùng cho lần OCR sau (không tải model lại).
-   * vie: dấu tiếng Việt; eng: header FAP (Weight, Assignment, …)
-   */
-  function getOcrWorker() {
-    if (ocrWorkerReady) return ocrWorkerReady;
-    if (!window.Tesseract || !Tesseract.createWorker) {
-      ocrWorkerReady = Promise.reject(new Error('no-tesseract'));
-      return ocrWorkerReady;
+  /* ---- Gemini keys (localStorage only — không commit) ---- */
+  function loadKeys() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(KEYS_LS) || '[]');
+      if (Array.isArray(arr)) {
+        return arr.map(function (k) { return String(k).trim(); }).filter(Boolean);
+      }
+    } catch (e) {}
+    return [];
+  }
+  function saveKeys(arr) {
+    localStorage.setItem(KEYS_LS, JSON.stringify(arr));
+  }
+  function seedKeysFromWindow() {
+    if (window.__FAP_GEMINI_KEYS__ && Array.isArray(window.__FAP_GEMINI_KEYS__) && window.__FAP_GEMINI_KEYS__.length) {
+      if (!loadKeys().length) saveKeys(window.__FAP_GEMINI_KEYS__.map(String));
     }
-    ocrWorkerReady = (async function () {
-      setStatus('Đang tải OCR tiếng Việt + Anh (lần đầu ~ vài MB)…', 'wait');
-      setBar(5);
-      var worker = await Tesseract.createWorker(OCR_LANG, 1, {
-        logger: function (m) {
-          if (!m) return;
-          if (m.status === 'loading language traineddata' && m.progress != null) {
-            setBar(5 + m.progress * 25);
-            setStatus('Tải model tiếng Việt… ' + Math.round(m.progress * 100) + '%', 'wait');
-          } else if (m.status === 'initializing api') {
-            setStatus('Khởi tạo OCR…', 'wait');
-            setBar(32);
-          } else if (m.status === 'recognizing text' && m.progress != null) {
-            setBar(40 + m.progress * 55);
-            setStatus('Đang đọc… ' + Math.round(m.progress * 100) + '%', 'wait');
-          }
+  }
+  function pickKey() {
+    var keys = loadKeys();
+    if (!keys.length) return null;
+    var idx = parseInt(localStorage.getItem(KEY_IDX_LS) || '0', 10) || 0;
+    if (idx < 0 || idx >= keys.length) idx = 0;
+    var key = keys[idx];
+    localStorage.setItem(KEY_IDX_LS, String((idx + 1) % keys.length));
+    return { key: key, index: idx, total: keys.length };
+  }
+  function refreshKeysUi() {
+    var n = loadKeys().length;
+    var box = document.getElementById('keysBox');
+    var st = document.getElementById('keysStatus');
+    if (!st) return;
+    if (n > 0) {
+      st.textContent = 'Đã lưu ' + n + ' key Gemini · hết quota sẽ xoay key.';
+      st.className = 'status ok';
+      if (box) box.open = false;
+    } else {
+      st.textContent = 'Chưa có key — dán key Gemini (AQ.…) rồi bấm Lưu key.';
+      st.className = 'status err';
+      if (box) box.open = true;
+    }
+  }
+
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () {
+        var s = String(r.result || '');
+        var i = s.indexOf(',');
+        resolve({ mime: file.type || 'image/jpeg', b64: i >= 0 ? s.slice(i + 1) : s });
+      };
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
+
+  var GEMINI_PROMPT =
+    'You extract FPT University My FAP "Mark Details" grade table from this screenshot.\n' +
+    'Return ONLY a JSON array (no markdown). Each element:\n' +
+    '{"item":"string","weight":number,"value":number|null,"isTotal":boolean}\n' +
+    'Rules:\n' +
+    '- item = Grade item name (Assignment 1, Progress test 1, Final Exam, Total, ...)\n' +
+    '- weight = percent number without % sign\n' +
+    '- value = score 0-10 if Value cell has a number, else null\n' +
+    '- isTotal true only for Total rows\n' +
+    '- Skip headers and Course total / Average / Status / Studying\n' +
+    '- Keep names as shown (English or Vietnamese)\n';
+
+  function parseGeminiJson(text) {
+    var t = String(text || '').trim();
+    t = t.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    var start = t.indexOf('[');
+    var end = t.lastIndexOf(']');
+    if (start >= 0 && end > start) t = t.slice(start, end + 1);
+    var arr = JSON.parse(t);
+    if (!Array.isArray(arr)) throw new Error('not-array');
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < arr.length; i++) {
+      var o = arr[i] || {};
+      var item = fixItemName(String(o.item || o.gradeItem || o.name || '').trim());
+      if (isJunkItem(item)) continue;
+      var weight = Number(o.weight != null ? o.weight : o.Weight);
+      if (!isFinite(weight) || weight <= 0 || weight > 100) continue;
+      var isTotal = !!o.isTotal || /^total$/i.test(item) || /^t[oổ]ng$/i.test(item);
+      if (isTotal) item = 'Total';
+      var value = null;
+      if (!isTotal && o.value != null && o.value !== '' && String(o.value).toLowerCase() !== 'null') {
+        var vv = Number(String(o.value).replace(',', '.'));
+        if (isFinite(vv) && vv >= 0 && vv <= 10) value = clamp(vv);
+      }
+      var key = item.toLowerCase() + '|' + weight;
+      if (seen[key]) continue;
+      seen[key] = true;
+      out.push({ id: uid(), category: '', item: item, weight: weight, value: value, isTotal: isTotal });
+    }
+    return out;
+  }
+
+  async function callGeminiVision(b64, mime, apiKey) {
+    var url =
+      'https://generativelanguage.googleapis.com/v1beta/models/' +
+      GEMINI_MODEL +
+      ':generateContent?key=' +
+      encodeURIComponent(apiKey);
+    var body = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: GEMINI_PROMPT },
+            { inline_data: { mime_type: mime || 'image/jpeg', data: b64 } },
+          ],
         },
-      });
-      // Ưu tiên layout theo dòng (bảng điểm)
-      try {
-        await worker.setParameters({
-          // 4 = single column of text (gần cột Grade item)
-          tessedit_pageseg_mode: '4',
-          preserve_interword_spaces: '1',
-        });
-      } catch (e) {}
-      ocrWorker = worker;
-      return worker;
-    })();
-    return ocrWorkerReady;
+      ],
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+    };
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      var msg = (data.error && data.error.message) || res.status + ' ' + res.statusText;
+      var err = new Error(msg);
+      err.status = res.status;
+      throw err;
+    }
+    var parts =
+      data.candidates &&
+      data.candidates[0] &&
+      data.candidates[0].content &&
+      data.candidates[0].content.parts;
+    var text = '';
+    if (parts) {
+      for (var i = 0; i < parts.length; i++) if (parts[i].text) text += parts[i].text;
+    }
+    if (!text) throw new Error('empty-response');
+    return text;
   }
 
   async function runOcr(file) {
@@ -897,75 +992,92 @@
     var thumb = document.getElementById('thumb');
     thumb.src = URL.createObjectURL(file);
     thumb.classList.add('on');
-    setStatus('Đang chuẩn bị ảnh…', 'wait');
-    setBar(4);
 
-    if (!window.Tesseract) {
-      setStatus('Không tải được OCR. Cần mạng (CDN) lần đầu.', 'err');
+    seedKeysFromWindow();
+    if (!loadKeys().length) {
+      setStatus('Chưa có Gemini key — mở ⚙️ bên dưới, dán key AQ.… rồi Lưu.', 'err');
+      var box = document.getElementById('keysBox');
+      if (box) box.open = true;
       btn.disabled = false;
       setBar(null);
       return;
     }
 
-    var blob = await prepImage(file);
+    setStatus('Đang gửi ảnh cho Gemini…', 'wait');
+    setBar(15);
+
+    var payload;
     try {
-      var worker = await getOcrWorker();
-      setStatus('Đang đọc (Việt + Anh)…', 'wait');
-      var result = await worker.recognize(blob);
-      var text = (result && result.data && result.data.text) || '';
-      var parsed = parseText(text);
-      if (!parsed.length) {
-        setStatus(
-          'Chưa đọc được bảng. Chụp rõ, đủ cột trọng số / Weight (vd 10.0 %).',
-          'err'
-        );
-        setBar(null);
+      var blob = await prepImage(file);
+      var useFile = blob instanceof Blob ? blob : file;
+      if (!(useFile instanceof File) && useFile instanceof Blob) {
+        useFile = new File([useFile], 'grade.png', { type: useFile.type || 'image/png' });
+      }
+      payload = await fileToBase64(useFile);
+    } catch (e) {
+      payload = await fileToBase64(file);
+    }
+
+    setBar(35);
+    var keys = loadKeys();
+    var tries = Math.min(keys.length, 8);
+    var lastErr = null;
+    for (var t = 0; t < tries; t++) {
+      var picked = pickKey();
+      if (!picked) break;
+      setStatus('Gemini đọc bảng… (key ' + (picked.index + 1) + '/' + picked.total + ')', 'wait');
+      setBar(40 + (t / tries) * 45);
+      try {
+        var text = await callGeminiVision(payload.b64, payload.mime, picked.key);
+        var parsed = [];
+        try {
+          parsed = parseGeminiJson(text);
+        } catch (pe) {
+          parsed = parseText(text);
+        }
+        if (!parsed.length) parsed = parseText(text);
+        if (!parsed.length) throw new Error('parse-empty');
+        rows = parsed;
+        setBar(100);
+        setStatus('Xong — ' + scorable().length + ' thành phần. Chạm 「Nhập」 để sửa.', 'ok');
+        render();
+        document.getElementById('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
         btn.disabled = false;
         return;
-      }
-      rows = parsed;
-      setBar(100);
-      setStatus(
-        'Xong — ' + scorable().length + ' thành phần. Chạm 「Nhập」 để gõ điểm.',
-        'ok'
-      );
-      render();
-      document.getElementById('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (e) {
-      console.error(e);
-      // Fallback one-shot eng+vie nếu worker fail
-      try {
-        setStatus('Thử lại OCR…', 'wait');
-        var result2 = await Tesseract.recognize(blob, OCR_LANG, {
-          logger: function (m) {
-            if (m.status === 'recognizing text' && m.progress != null) {
-              setBar(40 + m.progress * 55);
-            }
-          },
-        });
-        var text2 = (result2 && result2.data && result2.data.text) || '';
-        var parsed2 = parseText(text2);
-        if (parsed2.length) {
-          rows = parsed2;
-          setBar(100);
-          setStatus(
-            'Xong — ' + scorable().length + ' thành phần. Chạm 「Nhập」 để gõ điểm.',
-            'ok'
-          );
-          render();
-          document.getElementById('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-          setStatus('Lỗi OCR / không nhận ra bảng. Thử ảnh khác.', 'err');
-          setBar(null);
-        }
-      } catch (e2) {
-        console.error(e2);
-        setStatus('Lỗi OCR. Kiểm tra mạng rồi thử lại.', 'err');
-        setBar(null);
+      } catch (err) {
+        console.warn('Gemini try', t, err);
+        lastErr = err;
       }
     }
+    setStatus(
+      'Gemini lỗi: ' + (lastErr && lastErr.message ? lastErr.message : 'unknown') + ' — thử key/ảnh khác.',
+      'err'
+    );
+    setBar(null);
     btn.disabled = false;
   }
+
+  // Keys UI
+  seedKeysFromWindow();
+  var btnSaveKeys = document.getElementById('btnSaveKeys');
+  if (btnSaveKeys) {
+    btnSaveKeys.addEventListener('click', function () {
+      var raw = document.getElementById('keysInput').value || '';
+      var arr = raw.split(/\r?\n/).map(function (l) {
+        return l.replace(/^\s*\d+[\.\)\s]+/, '').trim();
+      }).filter(Boolean);
+      if (!arr.length) {
+        document.getElementById('keysStatus').textContent = 'Không thấy key.';
+        document.getElementById('keysStatus').className = 'status err';
+        return;
+      }
+      saveKeys(arr);
+      localStorage.setItem(KEY_IDX_LS, '0');
+      document.getElementById('keysInput').value = '';
+      refreshKeysUi();
+    });
+  }
+  refreshKeysUi();
 
   /* ---- wheel ----
    * Nguyên lý đúng:

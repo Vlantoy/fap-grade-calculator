@@ -7,3 +7,6 @@ node_modules/
 dist/
 .env
 *.local
+what-if-keys.seed.js
+**/gemini-keys*
+**/*secrets*
