@@ -8,9 +8,12 @@
  *   GEMINI_MODEL     — default gemini-2.5-flash (free tier still works)
  */
 
-// gemini-3.5-flash: available & OK on free AQ keys (2026-07 test)
-// gemini-2.0/2.5-flash often quota=0 for new free users
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+// Lightest working free model (2026-07 test on AQ keys):
+// - gemini-2.5-flash-lite → 404 "not available to new users"
+// - gemini-2.0-flash-lite → 429 quota
+// - gemini-3.1-flash-lite → 200 ~0.8s  ← default
+// - gemini-flash-lite-latest → 200 (alias)
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
 
 const PROMPT = `You extract FPT University My FAP "Mark Details" grade table from this screenshot.
 Return ONLY a JSON array (no markdown). Each element:
@@ -182,10 +185,10 @@ async function callWithRotation(imageBase64, mimeType) {
 
   const models = [
     DEFAULT_MODEL,
+    'gemini-3.1-flash-lite',
+    'gemini-flash-lite-latest',
     'gemini-3.5-flash',
-    'gemini-3-flash-preview',
     'gemini-flash-latest',
-    'gemini-2.5-flash',
   ].filter((v, i, a) => a.indexOf(v) === i);
 
   let lastErr = null;
