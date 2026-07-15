@@ -105,6 +105,7 @@
         }
       }
       if (!avgTd) avgTd = cells[cells.length - 1];
+      if (avgTd && !avgSnap) avgSnap = { el: avgTd, html: avgTd.innerHTML };
       continue;
     }
 
@@ -210,9 +211,6 @@
   setInterval(function () {
     if (!dead && Date.now() >= expiresAt) teardown();
   }, 1000);
-  setTimeout(function () {
-    if (!dead) teardown();
-  }, TTL_MS);
 
   var result = recalc();
   window.fapGradeMVP = fapGradeMVP;
