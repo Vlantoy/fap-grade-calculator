@@ -287,6 +287,47 @@
     .empty-pad { height: calc(var(--item-h) * 2); flex-shrink: 0; }
     .sheet-actions { display: flex; gap: 8px; padding: 0 16px 16px; }
     .sheet-actions .btn { flex: 1; justify-content: center; }
+
+    /* Live camera */
+    .cam-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: #000;
+      display: none; flex-direction: column;
+    }
+    .cam-overlay.open { display: flex; }
+    .cam-top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; padding-top: calc(12px + env(safe-area-inset-top, 0px));
+      color: #fff; background: rgba(0,0,0,.55); z-index: 2;
+    }
+    .cam-top button {
+      border: 0; background: rgba(255,255,255,.15); color: #fff;
+      font: inherit; font-weight: 700; padding: 10px 14px; border-radius: 10px; cursor: pointer;
+    }
+    .cam-video-wrap {
+      flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
+      overflow: hidden; background: #000;
+    }
+    .cam-video-wrap video {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .cam-hint {
+      position: absolute; left: 12px; right: 12px; top: 12px;
+      text-align: center; color: #fff; font-size: 0.85rem; font-weight: 600;
+      text-shadow: 0 1px 4px #000; pointer-events: none;
+    }
+    .cam-bottom {
+      padding: 16px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+      display: flex; justify-content: center; align-items: center;
+      background: rgba(0,0,0,.65); gap: 24px;
+    }
+    .cam-shutter {
+      width: 72px; height: 72px; border-radius: 50%;
+      border: 4px solid #fff; background: rgba(255,255,255,.25);
+      cursor: pointer; padding: 0;
+    }
+    .cam-shutter:active { background: #fff; }
+    .cam-shutter:disabled { opacity: .4; }
   </style>
 </head>
 <body>
@@ -308,14 +349,11 @@
         Chụp full bảng (Grade category → Value). Crop gọn, chữ rõ = OCR chính xác hơn.
       </p>
       <div class="ocr-actions">
-        <label class="btn btn-primary" for="fileCamera">
-          Chụp ảnh
-          <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden />
-        </label>
-        <label class="btn" for="fileGallery">
-          Thư viện
-          <input type="file" id="fileGallery" accept="image/*" hidden />
-        </label>
+        <button type="button" class="btn btn-primary" id="btnCamera">📷 Chụp ảnh</button>
+        <button type="button" class="btn" id="btnGallery">🖼 Thư viện</button>
+        <!-- capture: fallback OS camera; gallery: no capture -->
+        <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden />
+        <input type="file" id="fileGallery" accept="image/*,.heic,.heif" hidden />
       </div>
       <div class="preview-wrap" id="previewWrap">
         <img id="previewImg" alt="Preview ảnh OCR" />
@@ -367,6 +405,22 @@
       <a href="index.html">Trang chủ</a>
     </p>
   </main>
+
+  <!-- Live camera (getUserMedia) -->
+  <div class="cam-overlay" id="camOverlay" aria-hidden="true">
+    <div class="cam-top">
+      <button type="button" id="camClose">Đóng</button>
+      <span style="font-weight:700">Chụp bảng điểm</span>
+      <button type="button" id="camFlip" title="Đổi camera">⇄</button>
+    </div>
+    <div class="cam-video-wrap">
+      <video id="camVideo" playsinline autoplay muted></video>
+      <div class="cam-hint">Canh đủ 4 cột Weight / Value · chữ rõ</div>
+    </div>
+    <div class="cam-bottom">
+      <button type="button" class="cam-shutter" id="camShutter" aria-label="Chụp"></button>
+    </div>
+  </div>
 
   <div class="overlay" id="overlay" hidden></div>
   <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true">
@@ -945,7 +999,110 @@
     render();
   }
 
-  // ---------- Events ----------
+  // ---------- Camera (getUserMedia) + gallery ----------
+  var camStream = null;
+  var camFacing = 'environment';
+
+  function stopCamera() {
+    if (camStream) {
+      camStream.getTracks().forEach(function (t) {
+        t.stop();
+      });
+      camStream = null;
+    }
+    var v = document.getElementById('camVideo');
+    if (v) v.srcObject = null;
+    var ov = document.getElementById('camOverlay');
+    ov.classList.remove('open');
+    ov.setAttribute('aria-hidden', 'true');
+  }
+
+  async function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      // Fallback: OS file picker with capture (may still open gallery on some browsers)
+      setStatus('Trình duyệt không hỗ trợ camera trực tiếp — mở bộ chọn ảnh (chọn Camera nếu có).');
+      document.getElementById('fileCamera').click();
+      return;
+    }
+    stopCamera();
+    var ov = document.getElementById('camOverlay');
+    var video = document.getElementById('camVideo');
+    document.getElementById('camShutter').disabled = true;
+    setStatus('Đang mở camera…');
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: camFacing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      });
+      video.srcObject = camStream;
+      await video.play();
+      ov.classList.add('open');
+      ov.setAttribute('aria-hidden', 'false');
+      document.getElementById('camShutter').disabled = false;
+      setStatus('Camera sẵn sàng — canh bảng điểm rồi bấm nút tròn.');
+    } catch (err) {
+      console.warn(err);
+      setStatus(
+        'Không mở được camera (' +
+          (err && err.name ? err.name : 'error') +
+          '). Thử cấp quyền Camera, hoặc dùng Thư viện / bộ chọn hệ thống.',
+        'err'
+      );
+      // fallback OS camera intent
+      try {
+        document.getElementById('fileCamera').click();
+      } catch (e2) {}
+    }
+  }
+
+  function captureFromCamera() {
+    var video = document.getElementById('camVideo');
+    if (!video || !video.videoWidth) {
+      setStatus('Camera chưa sẵn sàng.', 'err');
+      return;
+    }
+    var canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    stopCamera();
+    canvas.toBlob(
+      function (blob) {
+        if (!blob) {
+          setStatus('Không chụp được frame.', 'err');
+          return;
+        }
+        var file = new File([blob], 'fap-capture-' + Date.now() + '.jpg', {
+          type: 'image/jpeg',
+        });
+        runOcr(file);
+      },
+      'image/jpeg',
+      0.92
+    );
+  }
+
+  document.getElementById('btnCamera').addEventListener('click', function () {
+    startCamera();
+  });
+  document.getElementById('btnGallery').addEventListener('click', function () {
+    document.getElementById('fileGallery').click();
+  });
+  document.getElementById('camClose').addEventListener('click', function () {
+    stopCamera();
+    setStatus('Đã đóng camera.');
+  });
+  document.getElementById('camShutter').addEventListener('click', captureFromCamera);
+  document.getElementById('camFlip').addEventListener('click', function () {
+    camFacing = camFacing === 'environment' ? 'user' : 'environment';
+    startCamera();
+  });
+
   document.getElementById('fileCamera').addEventListener('change', function (e) {
     onFiles(e.target.files);
     e.target.value = '';
