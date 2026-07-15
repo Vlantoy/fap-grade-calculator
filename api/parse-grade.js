@@ -1,6 +1,7 @@
 /**
- * Vercel Serverless — proxy Gemini Vision (key chỉ ở env server).
- * POST { imageBase64, mimeType? } → { rows: [...] }
+ * Vercel Serverless — POST /api/parse-grade
+ * Body: { imageBase64, mimeType? }
+ * Env: GEMINI_API_KEY (required), GEMINI_MODEL (optional)
  */
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
@@ -17,15 +18,14 @@ Rules:
 - Keep names as shown (English or Vietnamese)
 - Include every grade component row with a weight %`;
 
-// Simple in-memory rate limit (best-effort per instance)
 const hits = new Map();
 const WINDOW_MS = 60 * 1000;
-const MAX_PER_WINDOW = 12;
+const MAX_PER_WINDOW = 15;
 
 function clientIp(req) {
   const xf = req.headers['x-forwarded-for'];
   if (typeof xf === 'string' && xf.length) return xf.split(',')[0].trim();
-  return req.socket?.remoteAddress || 'unknown';
+  return req.headers['x-real-ip'] || 'unknown';
 }
 
 function rateLimit(ip) {
@@ -42,8 +42,12 @@ function rateLimit(ip) {
 function stripDataUrl(b64) {
   if (!b64) return '';
   const s = String(b64);
-  const i = s.indexOf(',');
-  if (s.startsWith('data:') && i >= 0) return s.slice(i + 1);
+  const i = s.indexOf('base64,');
+  if (i >= 0) return s.slice(i + 7);
+  if (s.startsWith('data:')) {
+    const j = s.indexOf(',');
+    return j >= 0 ? s.slice(j + 1) : s;
+  }
   return s;
 }
 
@@ -53,7 +57,9 @@ function normalizeRows(arr) {
   const seen = new Set();
   for (const o of arr) {
     if (!o || typeof o !== 'object') continue;
-    let item = String(o.item || o.gradeItem || o.name || '').replace(/\s+/g, ' ').trim();
+    let item = String(o.item || o.gradeItem || o.name || '')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (!item || item.length < 2) continue;
     if (/^grade\s*(category|item)$/i.test(item)) continue;
     if (/^(weight|value|comment)$/i.test(item)) continue;
@@ -91,12 +97,15 @@ function parseModelJson(text) {
 }
 
 async function callGemini(imageBase64, mimeType, apiKey) {
+  const model = GEMINI_MODEL;
   const url =
     'https://generativelanguage.googleapis.com/v1beta/models/' +
-    encodeURIComponent(GEMINI_MODEL) +
+    encodeURIComponent(model) +
     ':generateContent?key=' +
     encodeURIComponent(apiKey);
 
+  const mime = mimeType || 'image/jpeg';
+  // Support both snake_case (REST) forms Google accepts
   const body = {
     contents: [
       {
@@ -105,7 +114,7 @@ async function callGemini(imageBase64, mimeType, apiKey) {
           { text: PROMPT },
           {
             inline_data: {
-              mime_type: mimeType || 'image/jpeg',
+              mime_type: mime,
               data: imageBase64,
             },
           },
@@ -120,7 +129,10 @@ async function callGemini(imageBase64, mimeType, apiKey) {
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
     body: JSON.stringify(body),
   });
 
@@ -134,17 +146,31 @@ async function callGemini(imageBase64, mimeType, apiKey) {
 
   const parts = data?.candidates?.[0]?.content?.parts || [];
   const text = parts.map((p) => p.text || '').join('');
-  if (!text) throw new Error('Empty model response');
+  if (!text) {
+    // blocked / empty
+    const block = data?.candidates?.[0]?.finishReason || data?.promptFeedback?.blockReason;
+    throw new Error(block ? `Model blocked: ${block}` : 'Empty model response');
+  }
   return parseModelJson(text);
 }
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
+  }
+
+  // Health / debug
+  if (req.method === 'GET') {
+    return res.status(200).json({
+      ok: true,
+      service: 'parse-grade',
+      hasKey: Boolean(process.env.GEMINI_API_KEY),
+      model: GEMINI_MODEL,
+    });
   }
 
   if (req.method !== 'POST') {
@@ -158,30 +184,53 @@ module.exports = async function handler(req, res) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
+    return res.status(500).json({
+      error: 'Missing GEMINI_API_KEY on Vercel. Project → Settings → Environment Variables → add GEMINI_API_KEY → Redeploy.',
+    });
   }
 
   try {
-    const { imageBase64, mimeType } = req.body || {};
-    const b64 = stripDataUrl(imageBase64);
-    if (!b64 || b64.length < 100) {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        body = {};
+      }
+    }
+    body = body || {};
+
+    const b64 = stripDataUrl(body.imageBase64 || body.image || '');
+    if (!b64 || b64.length < 80) {
       return res.status(400).json({ error: 'imageBase64 required' });
     }
-    // rough size guard (~4MB base64)
-    if (b64.length > 5_500_000) {
-      return res.status(413).json({ error: 'Image too large' });
+    if (b64.length > 6_000_000) {
+      return res.status(413).json({ error: 'Image too large (max ~4MB)' });
     }
 
-    const rows = await callGemini(b64, mimeType || 'image/jpeg', apiKey);
+    const rows = await callGemini(b64, body.mimeType || 'image/jpeg', apiKey);
     if (!rows.length) {
-      return res.status(422).json({ error: 'Could not parse grade table from image', rows: [] });
+      return res.status(422).json({
+        error: 'Could not parse grade table from image',
+        rows: [],
+      });
     }
-    return res.status(200).json({ rows, model: GEMINI_MODEL });
+    return res.status(200).json({ ok: true, rows, model: GEMINI_MODEL });
   } catch (e) {
     console.error('[parse-grade]', e);
-    const status = e.status && e.status >= 400 && e.status < 600 ? e.status : 502;
+    const status = e.status >= 400 && e.status < 600 ? e.status : 502;
     return res.status(status).json({
       error: e.message || 'Gemini request failed',
     });
   }
+};
+
+// Vercel / Node function config
+module.exports.config = {
+  maxDuration: 60,
+  api: {
+    bodyParser: {
+      sizeLimit: '5mb',
+    },
+  },
 };

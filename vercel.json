@@ -1,7 +1,12 @@
 {
   "version": 2,
   "cleanUrls": true,
-  "trailingSlash": false,
+  "functions": {
+    "api/parse-grade.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",

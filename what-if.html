@@ -358,12 +358,17 @@
 
       <details class="keys-box" id="keysBox" style="margin-top:14px;text-align:left">
         <summary style="cursor:pointer;font-weight:700;color:#334155;font-size:0.9rem">
-          ⚙️ Tuỳ chọn nâng cao (key riêng)
+          ⚙️ Cấu hình server / key
         </summary>
         <p style="font-size:0.8rem;color:#64748b;margin:8px 0">
-          Mặc định dùng server Vercel (không cần key). Chỉ dán key Gemini (<code>AQ.…</code>) nếu muốn gọi API trực tiếp / fallback.
+          <strong>Mở site trên Vercel</strong> (URL <code>*.vercel.app</code>), không dùng github.io.
+          Vercel → Settings → Env: <code>GEMINI_API_KEY</code> → Redeploy.
         </p>
-        <textarea id="keysInput" rows="3" placeholder="AQ.xxxx (tuỳ chọn)" style="width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font:12px/1.4 ui-monospace,monospace"></textarea>
+        <input type="url" id="apiBaseInput" placeholder="https://xxx.vercel.app" style="width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font:12px/1.4 ui-monospace,monospace;margin-bottom:8px" />
+        <button type="button" class="btn-big secondary" id="btnSaveApiBase" style="margin-top:0">Lưu URL Vercel</button>
+        <button type="button" class="btn-big secondary" id="btnPingApi" style="margin-top:8px">Kiểm tra API</button>
+        <p style="font-size:0.8rem;color:#64748b;margin:12px 0 6px">Fallback key riêng (tuỳ chọn):</p>
+        <textarea id="keysInput" rows="2" placeholder="AQ.xxxx" style="width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font:12px/1.4 ui-monospace,monospace"></textarea>
         <button type="button" class="btn-big secondary" id="btnSaveKeys" style="margin-top:8px">Lưu key riêng</button>
         <div class="status" id="keysStatus" style="margin-top:6px"></div>
       </details>
@@ -417,10 +422,37 @@
 (function () {
   'use strict';
 
-  // Gemini Vision (key AQ.*) — thay Tesseract
+  // Gemini Vision via Vercel proxy (preferred) or personal key fallback
   var GEMINI_MODEL = 'gemini-2.0-flash';
   var KEYS_LS = 'fap_gemini_keys_v1';
   var KEY_IDX_LS = 'fap_gemini_key_idx_v1';
+  var API_BASE_LS = 'fap_api_base_v1';
+
+  /**
+   * GitHub Pages không có /api — phải gọi domain Vercel.
+   * Ưu tiên: localStorage override → same origin → guess vercel.app
+   */
+  function getApiBase() {
+    try {
+      var saved = (localStorage.getItem(API_BASE_LS) || '').replace(/\/$/, '');
+      if (saved) return saved;
+    } catch (e) {}
+    var host = location.hostname || '';
+    // Local vercel dev / production vercel
+    if (/vercel\.app$/i.test(host) || host === 'localhost' || host === '127.0.0.1') {
+      return '';
+    }
+    // GitHub Pages → default project name (đổi trong ⚙️ nếu khác)
+    if (/github\.io$/i.test(host)) {
+      return 'https://fap-grade-calculator.vercel.app';
+    }
+    return '';
+  }
+
+  function apiUrl(path) {
+    var base = getApiBase();
+    return (base || '') + path;
+  }
 
   var RESIT_RE = /\bresit\b|thi\s*l[aạ]i|retake|h[oọ]c\s*l[aạ]i/i;
   var HEADER_RE =
@@ -811,7 +843,8 @@
           var sy = Math.round(ih * 0.06);
           var sw = Math.round(iw * 0.92);
           var sh = Math.round(ih * 0.86);
-          var maxW = 1600;
+          // Nén mạnh hơn để vừa body limit Vercel
+          var maxW = 1280;
           var scale = sw > maxW ? maxW / sw : 1;
           var w = Math.round(sw * scale);
           var h = Math.round(sh * scale);
@@ -828,7 +861,7 @@
               resolve(b || file);
             },
             'image/jpeg',
-            0.9
+            0.82
           );
         } catch (e) {
           URL.revokeObjectURL(url);
@@ -1025,10 +1058,12 @@
     }
 
     // 1) Vercel proxy — không cần key trên client
-    setStatus('Đang đọc bảng điểm (server)…', 'wait');
+    var endpoint = apiUrl('/api/parse-grade');
+    setStatus('Đang đọc bảng điểm… (' + (getApiBase() || location.host) + ')', 'wait');
     setBar(40);
+    var proxyErrMsg = '';
     try {
-      var proxyRes = await fetch('/api/parse-grade', {
+      var proxyRes = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1042,19 +1077,37 @@
         btn.disabled = false;
         return;
       }
-      // 404/500 khi chạy local không có vercel dev → fallback key
-      if (proxyRes.status !== 404) {
-        console.warn('proxy', proxyRes.status, proxyData);
+      proxyErrMsg = proxyData.error || ('HTTP ' + proxyRes.status);
+      console.warn('proxy', proxyRes.status, proxyData);
+      if (proxyRes.status === 500 && /GEMINI_API_KEY/i.test(proxyErrMsg)) {
+        setStatus(
+          'Vercel thiếu GEMINI_API_KEY. Vercel → Project → Settings → Environment Variables → thêm key → Redeploy.',
+          'err'
+        );
+        var box0 = document.getElementById('keysBox');
+        if (box0) box0.open = true;
+        btn.disabled = false;
+        setBar(null);
+        return;
+      }
+      if (proxyRes.status === 404 || proxyRes.status === 0) {
+        proxyErrMsg =
+          'Không thấy API (đang mở sai domain?). Dùng URL *.vercel.app hoặc set URL trong ⚙️.';
       }
     } catch (proxyErr) {
       console.warn('proxy fail', proxyErr);
+      proxyErrMsg = proxyErr.message || 'network';
+      if (/github\.io/i.test(location.hostname) && !getApiBase()) {
+        proxyErrMsg = 'GitHub Pages không có API. Mở site trên Vercel hoặc dán URL Vercel trong ⚙️.';
+      }
     }
 
     // 2) Fallback: key Gemini trên máy user
     var keys = loadKeys();
     if (!keys.length) {
       setStatus(
-        'Server chưa sẵn sàng / lỗi. Mở ⚙️ dán key Gemini (AQ.…) để fallback, hoặc đợi deploy Vercel.',
+        (proxyErrMsg ? proxyErrMsg + ' · ' : '') +
+          'Hoặc mở ⚙️ dán key Gemini (AQ.…) để fallback.',
         'err'
       );
       var box = document.getElementById('keysBox');
@@ -1097,8 +1150,13 @@
     btn.disabled = false;
   }
 
-  // Keys UI
+  // Keys + API base UI
   seedKeysFromWindow();
+  try {
+    var apiIn = document.getElementById('apiBaseInput');
+    if (apiIn) apiIn.value = localStorage.getItem(API_BASE_LS) || getApiBase() || '';
+  } catch (e) {}
+
   var btnSaveKeys = document.getElementById('btnSaveKeys');
   if (btnSaveKeys) {
     btnSaveKeys.addEventListener('click', function () {
@@ -1117,7 +1175,56 @@
       refreshKeysUi();
     });
   }
+  var btnSaveApiBase = document.getElementById('btnSaveApiBase');
+  if (btnSaveApiBase) {
+    btnSaveApiBase.addEventListener('click', function () {
+      var v = (document.getElementById('apiBaseInput').value || '').trim().replace(/\/$/, '');
+      if (v && !/^https?:\/\//i.test(v)) v = 'https://' + v;
+      localStorage.setItem(API_BASE_LS, v);
+      document.getElementById('keysStatus').textContent = v
+        ? 'Đã lưu API: ' + v
+        : 'Đã xóa override — dùng mặc định.';
+      document.getElementById('keysStatus').className = 'status ok';
+    });
+  }
+  var btnPingApi = document.getElementById('btnPingApi');
+  if (btnPingApi) {
+    btnPingApi.addEventListener('click', async function () {
+      var st = document.getElementById('keysStatus');
+      st.textContent = 'Đang ping ' + apiUrl('/api/parse-grade') + ' …';
+      st.className = 'status wait';
+      try {
+        var r = await fetch(apiUrl('/api/parse-grade'), { method: 'GET' });
+        var j = await r.json().catch(function () { return {}; });
+        if (r.ok && j.ok) {
+          st.textContent =
+            'API OK · hasKey=' +
+            j.hasKey +
+            ' · model=' +
+            (j.model || '?') +
+            (j.hasKey ? '' : ' ⚠️ Chưa set GEMINI_API_KEY trên Vercel!');
+          st.className = j.hasKey ? 'status ok' : 'status err';
+        } else {
+          st.textContent = 'API lỗi HTTP ' + r.status + ' — kiểm tra deploy / URL Vercel.';
+          st.className = 'status err';
+        }
+      } catch (e) {
+        st.textContent = 'Không kết nối được API: ' + (e.message || e);
+        st.className = 'status err';
+      }
+    });
+  }
   refreshKeysUi();
+
+  // Cảnh báo nếu đang ở GitHub Pages
+  if (/github\.io$/i.test(location.hostname)) {
+    setStatus(
+      'Đang mở GitHub Pages. Nên mở URL *.vercel.app — hoặc dán URL Vercel trong ⚙️ rồi Kiểm tra API.',
+      'wait'
+    );
+    var kb = document.getElementById('keysBox');
+    if (kb) kb.open = true;
+  }
 
   /* ---- wheel ----
    * Nguyên lý đúng:
