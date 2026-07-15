@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>What-if Mark Details — FAP Grade Calculator</title>
+  <meta name="description" content="Tính điểm FAP what-if: bảng Mark Details, bánh xe số 0–9, resit. Không cần cài gì." />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="assets/favicon-32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy: #0f172a;
+      --navy2: #1e293b;
+      --header: #1a2744;
+      --border: #e2e8f0;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --green: #16a34a;
+      --blue: #0284c7;
+      --accent: #0ea5e9;
+      --danger: #dc2626;
+      --shadow: 0 8px 30px rgba(15, 23, 42, 0.12);
+      --radius: 16px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --wheel-item: 44px;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      padding-bottom: calc(88px + var(--safe-b));
+    }
+
+    /* App-like top bar */
+    .app-bar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: var(--header);
+      color: #fff;
+      padding: 12px 14px calc(12px + env(safe-area-inset-top, 0px));
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.2);
+    }
+    .app-bar a.back {
+      color: #fff;
+      text-decoration: none;
+      width: 36px; height: 36px;
+      display: grid; place-items: center;
+      border-radius: 10px;
+      font-size: 20px;
+    }
+    .app-bar a.back:active { background: rgba(255,255,255,.12); }
+    .app-bar h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      flex: 1;
+      text-align: center;
+      letter-spacing: -0.02em;
+      padding-right: 36px;
+    }
+
+    .wrap { width: min(520px, 100%); margin: 0 auto; padding: 14px 12px 0; }
+
+    .course-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 1px solid #e8eef5;
+    }
+    .course-meta {
+      padding: 12px 14px 8px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .course-meta input[type="text"] {
+      flex: 1;
+      min-width: 140px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      font-weight: 600;
+    }
+    .hint {
+      margin: 0 14px 12px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    table.mark {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    table.mark thead th {
+      background: var(--header);
+      color: #fff;
+      font-weight: 600;
+      text-align: left;
+      padding: 10px 8px;
+      font-size: 0.75rem;
+    }
+    table.mark td {
+      border-bottom: 1px solid #eef2f7;
+      padding: 0;
+      vertical-align: middle;
+    }
+    table.mark tbody tr:last-child td { border-bottom: none; }
+    .cell {
+      padding: 10px 8px;
+      min-height: 44px;
+    }
+    .cat {
+      font-weight: 600;
+      color: #334155;
+      background: #f8fafc;
+      width: 28%;
+    }
+    .item { width: 32%; color: #475569; }
+    .weight {
+      width: 18%;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      color: #334155;
+      font-weight: 600;
+    }
+    .value-cell { width: 22%; text-align: center; }
+
+    tr.total-row .cell { color: var(--muted); font-weight: 500; background: #fafbfc; }
+    tr.avg-row .cell {
+      font-weight: 700;
+      background: #f0fdf4;
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+    tr.avg-row .avg-num {
+      font-size: 1.15rem;
+      color: var(--green);
+    }
+    .status-ok { color: var(--green); font-weight: 600; }
+
+    .val-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 52px;
+      min-height: 36px;
+      padding: 6px 10px;
+      border: 1.5px dashed #94a3b8;
+      border-radius: 10px;
+      background: #f8fafc;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+    }
+    .val-btn.has {
+      border-style: solid;
+      border-color: var(--accent);
+      background: #e0f2fe;
+      color: var(--navy);
+    }
+    .val-btn:active { transform: scale(0.97); }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 14px 14px;
+      border-top: 1px solid #eef2f7;
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .btn:active { background: #f1f5f9; }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #0ea5e9);
+      border-color: transparent;
+      color: #fff;
+    }
+    .btn-danger { color: var(--danger); border-color: #fecaca; }
+
+    .footer-bar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 45;
+      background: rgba(255,255,255,.94);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--border);
+      padding: 10px 14px calc(10px + var(--safe-b));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .footer-bar .label { font-size: 0.8rem; color: var(--muted); }
+    .footer-bar .big {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--green);
+      font-variant-numeric: tabular-nums;
+    }
+    .footer-bar .sub { font-size: 0.85rem; color: var(--blue); font-weight: 700; }
+
+    /* Reverse FE card */
+    .need-card {
+      margin-top: 12px;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      border: 1px solid #e8eef5;
+    }
+    .need-card h2 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+    }
+    .need-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .need-row label { font-size: 0.8rem; color: var(--muted); }
+    .need-row input {
+      width: 72px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      font: inherit;
+      font-weight: 600;
+    }
+    .need-result {
+      margin-top: 10px;
+      font-weight: 700;
+      color: var(--navy);
+      min-height: 1.4em;
+    }
+
+    /* Wheel sheet */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.45);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    .overlay.open { opacity: 1; pointer-events: auto; }
+
+    .sheet {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 110;
+      background: #fff;
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 -8px 40px rgba(0,0,0,.2);
+      transform: translateY(110%);
+      transition: transform .28s cubic-bezier(.2,.8,.2,1);
+      padding-bottom: var(--safe-b);
+      max-height: 75vh;
+    }
+    .sheet.open { transform: translateY(0); }
+    .sheet-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 8px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .sheet-head .title { font-weight: 700; font-size: 0.95rem; }
+    .sheet-head button {
+      border: 0;
+      background: transparent;
+      font: inherit;
+      font-weight: 700;
+      color: var(--blue);
+      cursor: pointer;
+      padding: 8px 10px;
+    }
+    .sheet-sub {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+      padding: 4px 16px 0;
+    }
+    .preview {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      padding: 8px 0 4px;
+      color: var(--navy);
+    }
+
+    .wheels {
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      gap: 4px;
+      padding: 8px 20px 20px;
+      position: relative;
+      user-select: none;
+    }
+    .wheel-col {
+      width: 72px;
+      height: calc(var(--wheel-item) * 5);
+      overflow-y: auto;
+      overflow-x: hidden;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+      -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+    }
+    .wheel-col::-webkit-scrollbar { display: none; }
+    .wheel-dot {
+      width: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--muted);
+      pointer-events: none;
+    }
+    .wheel-item {
+      height: var(--wheel-item);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #94a3b8;
+      scroll-snap-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .selection-bar {
+      position: absolute;
+      left: 24px; right: 24px;
+      top: 50%;
+      height: var(--wheel-item);
+      margin-top: calc(var(--wheel-item) / -2 + 4px);
+      border-radius: 12px;
+      background: rgba(14, 165, 233, 0.1);
+      border: 1.5px solid rgba(14, 165, 233, 0.45);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .wheels .wheel-col, .wheels .wheel-dot { position: relative; z-index: 1; }
+
+    .sheet-actions {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 16px;
+    }
+    .sheet-actions .btn { flex: 1; padding: 12px; }
+    .sheet-actions .btn-clear { color: var(--muted); }
+
+    .empty-pad {
+      height: calc(var(--wheel-item) * 2);
+      flex-shrink: 0;
+    }
+
+    @media (min-width: 640px) {
+      body { padding-bottom: 24px; }
+      .footer-bar {
+        position: static;
+        margin: 12px auto 0;
+        width: min(520px, calc(100% - 24px));
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-bar">
+    <a class="back" href="index.html" aria-label="Về trang chủ">←</a>
+    <h1>Mark Details</h1>
+  </header>
+
+  <div class="wrap">
+    <div class="course-card">
+      <div class="course-meta">
+        <input type="text" id="courseName" value="What-if Course" placeholder="Tên môn" aria-label="Tên môn" />
+      </div>
+      <p class="hint">Tap ô Value → bánh xe số. Dòng Total không nhập. Resit có điểm sẽ thay lần 1 cùng loại.</p>
+      <div style="overflow-x:auto">
+        <table class="mark" id="markTable">
+          <thead>
+            <tr>
+              <th>Grade category</th>
+              <th>Grade item</th>
+              <th>Weight</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody id="markBody"></tbody>
+        </table>
+      </div>
+      <div class="toolbar">
+        <button type="button" class="btn" id="btnAdd">+ Thành phần</button>
+        <button type="button" class="btn" id="btnTemplate">Template mẫu</button>
+        <button type="button" class="btn btn-danger" id="btnClearVals">Xóa điểm</button>
+      </div>
+    </div>
+
+    <div class="need-card">
+      <h2>Cần bao nhiêu trên một thành phần?</h2>
+      <p class="hint" style="margin:0">Chọn dòng đang trống (hoặc bất kỳ), đặt mốc Average mong muốn.</p>
+      <div class="need-row">
+        <label>Mốc TB</label>
+        <input type="number" id="targetAvg" value="5" min="0" max="10" step="0.1" />
+        <label>Theo dòng #</label>
+        <input type="number" id="targetIdx" value="0" min="0" step="1" title="Index thành phần (0-based, bỏ Total)" />
+      </div>
+      <div class="need-result" id="needResult">—</div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div>
+      <div class="label">Average (what-if)</div>
+      <div class="big" id="footerAvg">0.0</div>
+    </div>
+    <div style="text-align:right">
+      <div class="label">Letter</div>
+      <div class="sub" id="footerLetter">—</div>
+    </div>
+  </div>
+
+  <!-- Wheel picker -->
+  <div class="overlay" id="overlay" hidden></div>
+  <div class="sheet" id="sheet" hidden aria-modal="true" role="dialog">
+    <div class="sheet-head">
+      <button type="button" id="sheetCancel">Hủy</button>
+      <div class="title" id="sheetTitle">Nhập điểm</div>
+      <button type="button" id="sheetDone">Xong</button>
+    </div>
+    <div class="sheet-sub" id="sheetSub"></div>
+    <div class="preview" id="sheetPreview">0.0</div>
+    <div class="wheels">
+      <div class="selection-bar"></div>
+      <div class="wheel-col" id="wheelInt" aria-label="Phần nguyên"></div>
+      <div class="wheel-dot">.</div>
+      <div class="wheel-col" id="wheelDec" aria-label="Phần thập phân"></div>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-clear" id="sheetClear">Để trống</button>
+      <button type="button" class="btn btn-primary" id="sheetOk">Áp dụng</button>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  'use strict';
+
+  var RESIT_RE = /\bresit\b|thi\s*lại|thi\s*lai|retake/i;
+  var ITEM_H = 44; // must match --wheel-item
+
+  /** @type {{id:string, category:string, item:string, weight:number, value:number|null, isTotal?:boolean, isAvg?:boolean, isStatus?:boolean}[]} */
+  var rows = [];
+  var editId = null;
+  var snapTimers = { int: null, dec: null };
+
+  function uid() {
+    return 'r' + Math.random().toString(36).slice(2, 9);
+  }
+
+  function defaultTemplate() {
+    return [
+      { id: uid(), category: 'Assignment', item: 'Assignment 1', weight: 10, value: null },
+      { id: uid(), category: 'Assignment', item: 'Assignment 2', weight: 10, value: null },
+      { id: uid(), category: 'Assignment', item: 'Total', weight: 20, value: null, isTotal: true },
+      { id: uid(), category: 'Progress test', item: 'Progress test 1', weight: 10, value: 8.3 },
+      { id: uid(), category: 'Progress test', item: 'Progress test 2', weight: 10, value: null },
+      { id: uid(), category: 'Progress test', item: 'Total', weight: 20, value: null, isTotal: true },
+      { id: uid(), category: 'Practical Exam', item: 'Practical Exam', weight: 30, value: null },
+      { id: uid(), category: 'Practical Exam', item: 'Total', weight: 30, value: null, isTotal: true },
+      { id: uid(), category: 'Final Exam', item: 'Final Exam', weight: 30, value: null },
+      { id: uid(), category: 'Final Exam', item: 'Total', weight: 30, value: null, isTotal: true },
+      { id: uid(), category: 'Final Exam Resit', item: 'Final Exam Resit', weight: 30, value: null },
+      { id: uid(), category: 'Final Exam Resit', item: 'Total', weight: 30, value: null, isTotal: true },
+    ];
+  }
+
+  function isResit(name) {
+    return RESIT_RE.test(name || '');
+  }
+  function baseKey(name) {
+    return String(name || '')
+      .toLowerCase()
+      .replace(RESIT_RE, ' ')
+      .replace(/[:\-_|]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function letterOf(m) {
+    if (m == null || !isFinite(m)) return '—';
+    if (m >= 9) return 'A+';
+    if (m >= 8.5) return 'A';
+    if (m >= 8) return 'B+';
+    if (m >= 7) return 'B';
+    if (m >= 6.5) return 'C+';
+    if (m >= 5.5) return 'C';
+    if (m >= 5) return 'D+';
+    if (m >= 4) return 'D';
+    return 'F';
+  }
+  function clampScore(v) {
+    if (v == null || !isFinite(v)) return null;
+    return Math.min(10, Math.max(0, Math.round(v * 10) / 10));
+  }
+
+  function components() {
+    return rows.filter(function (r) {
+      return !r.isTotal && !r.isAvg && !r.isStatus && r.weight > 0;
+    });
+  }
+
+  function calcAverage() {
+    var comps = components();
+    var resitOn = {};
+    comps.forEach(function (c) {
+      if (isResit(c.item) && c.value != null) resitOn[baseKey(c.item)] = true;
+    });
+    var sum = 0;
+    comps.forEach(function (c) {
+      var w = c.weight;
+      if (isResit(c.item)) {
+        if (c.value == null) return;
+        sum += (c.value * w) / 100;
+        return;
+      }
+      if (resitOn[baseKey(c.item)]) return;
+      var v = c.value == null ? 0 : c.value;
+      sum += (v * w) / 100;
+    });
+    return Math.round(sum * 100) / 100;
+  }
+
+  function formatVal(v) {
+    if (v == null) return '—';
+    return (Math.round(v * 10) / 10).toFixed(1);
+  }
+
+  function categoryRowspanMap() {
+    var map = {};
+    var i = 0;
+    while (i < rows.length) {
+      var cat = rows[i].category;
+      var start = i;
+      var n = 0;
+      while (i < rows.length && rows[i].category === cat) {
+        n++;
+        i++;
+      }
+      map[start] = n;
+    }
+    return map;
+  }
+
+  function render() {
+    var body = document.getElementById('markBody');
+    var rs = categoryRowspanMap();
+    var avg = calcAverage();
+    var html = '';
+    var lastCat = null;
+
+    rows.forEach(function (r, idx) {
+      var cls = r.isTotal ? 'total-row' : '';
+      html += '<tr class="' + cls + '" data-id="' + r.id + '">';
+      if (r.category !== lastCat) {
+        var span = rs[idx] || 1;
+        html +=
+          '<td class="cell cat" rowspan="' +
+          span +
+          '">' +
+          escapeHtml(r.category) +
+          '</td>';
+        lastCat = r.category;
+      }
+      html += '<td class="cell item">' + escapeHtml(r.item) + '</td>';
+      html += '<td class="cell weight">' + (r.weight != null ? r.weight.toFixed(1) + ' %' : '') + '</td>';
+      html += '<td class="cell value-cell">';
+      if (r.isTotal) {
+        html += '';
+      } else {
+        var has = r.value != null;
+        html +=
+          '<button type="button" class="val-btn' +
+          (has ? ' has' : '') +
+          '" data-edit="' +
+          r.id +
+          '">' +
+          (has ? formatVal(r.value) : '···') +
+          '</button>';
+      }
+      html += '</td></tr>';
+    });
+
+    // Course total footer rows
+    html +=
+      '<tr class="avg-row">' +
+      '<td class="cell cat" rowspan="2">Course total</td>' +
+      '<td class="cell item">Average</td>' +
+      '<td class="cell weight"></td>' +
+      '<td class="cell value-cell avg-num">' +
+      avg.toFixed(1) +
+      '</td></tr>';
+    html +=
+      '<tr class="avg-row">' +
+      '<td class="cell item">Status</td>' +
+      '<td class="cell weight"></td>' +
+      '<td class="cell value-cell status-ok">Studying</td></tr>';
+
+    body.innerHTML = html;
+    document.getElementById('footerAvg').textContent = avg.toFixed(1);
+    document.getElementById('footerLetter').textContent = letterOf(avg);
+    updateNeed();
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function findRow(id) {
+    for (var i = 0; i < rows.length; i++) if (rows[i].id === id) return rows[i];
+    return null;
+  }
+
+  // ----- Wheel -----
+  function buildWheel(el, maxInclusive) {
+    el.innerHTML = '';
+    var pad = document.createElement('div');
+    pad.className = 'empty-pad';
+    el.appendChild(pad);
+    for (var i = 0; i <= maxInclusive; i++) {
+      var d = document.createElement('div');
+      d.className = 'wheel-item';
+      d.textContent = String(i);
+      d.dataset.v = String(i);
+      el.appendChild(d);
+    }
+    var pad2 = document.createElement('div');
+    pad2.className = 'empty-pad';
+    el.appendChild(pad2);
+  }
+
+  function scrollToValue(el, value, smooth) {
+    var target = ITEM_H * value; // first real item after pad of 2*ITEM_H? pad is 2 items = 88
+    // empty-pad height = 2 * ITEM_H, item 0 at scrollTop = 0 relative to first item center
+    // scroll so item `value` is centered: pad (2*H) + value*H - 2*H = value*H ... 
+    // With 5 visible slots, center is slot index 2. Pad of 2 items means item 0 centers at scrollTop 0.
+    var top = value * ITEM_H;
+    el.scrollTo({ top: top, behavior: smooth ? 'smooth' : 'auto' });
+  }
+
+  function readWheel(el) {
+    var st = el.scrollTop;
+    var idx = Math.round(st / ITEM_H);
+    var max = el.querySelectorAll('.wheel-item').length - 1;
+    if (idx < 0) idx = 0;
+    if (idx > max) idx = max;
+    return idx;
+  }
+
+  function syncPreview() {
+    var wi = document.getElementById('wheelInt');
+    var wd = document.getElementById('wheelDec');
+    var i = readWheel(wi);
+    var d = readWheel(wd);
+    // 10.x only allow 10.0
+    if (i >= 10) {
+      i = 10;
+      d = 0;
+    }
+    var v = i >= 10 ? 10 : i + d / 10;
+    document.getElementById('sheetPreview').textContent = v.toFixed(1);
+    // dim selected style
+    highlightWheel(wi, i);
+    highlightWheel(wd, i >= 10 ? 0 : d);
+  }
+
+  function highlightWheel(el, activeIdx) {
+    var items = el.querySelectorAll('.wheel-item');
+    for (var k = 0; k < items.length; k++) {
+      items[k].style.color = k === activeIdx ? '#0f172a' : '';
+      items[k].style.fontSize = k === activeIdx ? '1.55rem' : '';
+    }
+  }
+
+  function openPicker(id) {
+    var row = findRow(id);
+    if (!row || row.isTotal) return;
+    editId = id;
+    document.getElementById('sheetTitle').textContent = 'Nhập điểm';
+    document.getElementById('sheetSub').textContent =
+      row.item + ' · ' + row.weight.toFixed(1) + '%';
+
+    var wi = document.getElementById('wheelInt');
+    var wd = document.getElementById('wheelDec');
+    buildWheel(wi, 10); // 0..10
+    buildWheel(wd, 9);
+
+    var v = row.value != null ? row.value : 0;
+    var ip = Math.min(10, Math.floor(v + 1e-9));
+    var dp = Math.round((v - ip) * 10);
+    if (ip >= 10) {
+      ip = 10;
+      dp = 0;
+    }
+    if (dp < 0) dp = 0;
+    if (dp > 9) dp = 9;
+
+    var overlay = document.getElementById('overlay');
+    var sheet = document.getElementById('sheet');
+    overlay.hidden = false;
+    sheet.hidden = false;
+    requestAnimationFrame(function () {
+      overlay.classList.add('open');
+      sheet.classList.add('open');
+      scrollToValue(wi, ip, false);
+      scrollToValue(wd, dp, false);
+      syncPreview();
+    });
+  }
+
+  function closePicker() {
+    var overlay = document.getElementById('overlay');
+    var sheet = document.getElementById('sheet');
+    overlay.classList.remove('open');
+    sheet.classList.remove('open');
+    setTimeout(function () {
+      overlay.hidden = true;
+      sheet.hidden = true;
+      editId = null;
+    }, 250);
+  }
+
+  function applyPicker(clear) {
+    if (!editId) return;
+    var row = findRow(editId);
+    if (!row) return;
+    if (clear) {
+      row.value = null;
+    } else {
+      var i = readWheel(document.getElementById('wheelInt'));
+      var d = readWheel(document.getElementById('wheelDec'));
+      if (i >= 10) row.value = 10;
+      else row.value = clampScore(i + d / 10);
+    }
+    closePicker();
+    render();
+  }
+
+  function onWheelScroll(el, key) {
+    if (snapTimers[key]) clearTimeout(snapTimers[key]);
+    snapTimers[key] = setTimeout(function () {
+      var idx = readWheel(el);
+      scrollToValue(el, idx, true);
+      // lock decimal if int is 10
+      if (key === 'int' && idx >= 10) {
+        scrollToValue(document.getElementById('wheelDec'), 0, true);
+      }
+      syncPreview();
+    }, 80);
+    syncPreview();
+  }
+
+  // ----- Need score -----
+  function updateNeed() {
+    var comps = components();
+    var el = document.getElementById('needResult');
+    var target = parseFloat(document.getElementById('targetAvg').value);
+    var idx = parseInt(document.getElementById('targetIdx').value, 10);
+    if (!isFinite(target)) {
+      el.textContent = 'Nhập mốc Average hợp lệ.';
+      return;
+    }
+    if (!comps.length) {
+      el.textContent = 'Chưa có thành phần.';
+      return;
+    }
+    if (!isFinite(idx) || idx < 0 || idx >= comps.length) {
+      el.textContent =
+        'Index dòng 0…' +
+        (comps.length - 1) +
+        ' (hiện: ' +
+        comps
+          .map(function (c, i) {
+            return i + '=' + c.item;
+          })
+          .join(', ') +
+        ')';
+      return;
+    }
+    var focus = comps[idx];
+    // sum of other contributions with resit rules, treating focus as unknown
+    var resitOn = {};
+    comps.forEach(function (c) {
+      if (c === focus) return;
+      if (isResit(c.item) && c.value != null) resitOn[baseKey(c.item)] = true;
+    });
+    // if focus is first-attempt and resit active, need N/A
+    if (!isResit(focus.item) && resitOn[baseKey(focus.item)]) {
+      el.textContent = 'Dòng này đang bị Resit thay — chọn dòng Resit.';
+      return;
+    }
+    var others = 0;
+    comps.forEach(function (c) {
+      if (c === focus) return;
+      if (isResit(c.item)) {
+        if (c.value == null) return;
+        others += (c.value * c.weight) / 100;
+        return;
+      }
+      if (resitOn[baseKey(c.item)]) return;
+      var v = c.value == null ? 0 : c.value;
+      others += (v * c.weight) / 100;
+    });
+    var w = focus.weight;
+    if (w <= 0) {
+      el.textContent = 'Weight = 0.';
+      return;
+    }
+    var need = ((target - others) * 100) / w;
+    need = Math.round(need * 10) / 10;
+    var msg =
+      'Để Average ≥ ' +
+      target.toFixed(1) +
+      ' → ' +
+      focus.item +
+      ' cần ≥ ' +
+      need.toFixed(1);
+    if (need > 10) msg += ' (không thể — max 10)';
+    else if (need <= 0) msg += ' (đã đủ dù 0 điểm)';
+    el.textContent = msg;
+  }
+
+  // ----- Events -----
+  document.getElementById('markBody').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-edit]');
+    if (!btn) return;
+    openPicker(btn.getAttribute('data-edit'));
+  });
+
+  document.getElementById('overlay').addEventListener('click', closePicker);
+  document.getElementById('sheetCancel').addEventListener('click', closePicker);
+  document.getElementById('sheetDone').addEventListener('click', function () {
+    applyPicker(false);
+  });
+  document.getElementById('sheetOk').addEventListener('click', function () {
+    applyPicker(false);
+  });
+  document.getElementById('sheetClear').addEventListener('click', function () {
+    applyPicker(true);
+  });
+
+  document.getElementById('wheelInt').addEventListener(
+    'scroll',
+    function () {
+      onWheelScroll(document.getElementById('wheelInt'), 'int');
+    },
+    { passive: true }
+  );
+  document.getElementById('wheelDec').addEventListener(
+    'scroll',
+    function () {
+      onWheelScroll(document.getElementById('wheelDec'), 'dec');
+    },
+    { passive: true }
+  );
+
+  document.getElementById('btnTemplate').addEventListener('click', function () {
+    if (rows.some(function (r) { return r.value != null; })) {
+      if (!confirm('Load template mẫu? Điểm đã nhập sẽ mất.')) return;
+    }
+    rows = defaultTemplate();
+    render();
+  });
+
+  document.getElementById('btnClearVals').addEventListener('click', function () {
+    rows.forEach(function (r) {
+      if (!r.isTotal) r.value = null;
+    });
+    render();
+  });
+
+  document.getElementById('btnAdd').addEventListener('click', function () {
+    var cat = prompt('Grade category', 'Custom');
+    if (cat == null) return;
+    var item = prompt('Grade item', 'Component');
+    if (item == null) return;
+    var w = parseFloat(prompt('Weight %', '10'));
+    if (!isFinite(w) || w <= 0) w = 10;
+    rows.push({
+      id: uid(),
+      category: cat.trim() || 'Custom',
+      item: item.trim() || 'Component',
+      weight: w,
+      value: null,
+    });
+    render();
+  });
+
+  document.getElementById('targetAvg').addEventListener('input', updateNeed);
+  document.getElementById('targetIdx').addEventListener('input', updateNeed);
+
+  // boot
+  rows = defaultTemplate();
+  render();
+})();
+  </script>
+</body>
+</html>
