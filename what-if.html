@@ -346,7 +346,7 @@
       <h2>Chọn ảnh bảng điểm</h2>
       <p>
         Vào My FAP → Mark Details → chụp màn hình hoặc chọn ảnh đã lưu.<br />
-        Máy sẽ <strong>tự đọc</strong> các thành phần điểm.
+        OCR <strong>tiếng Việt + Anh</strong> (Tesseract vie+eng) — tự nhận thẻ điểm.
       </p>
       <button type="button" class="btn-big" id="btnPick">
         Chọn / chụp ảnh
@@ -404,10 +404,18 @@
 (function () {
   'use strict';
 
-  var RESIT_RE = /\bresit\b|thi\s*l[aạ]i|retake/i;
-  var HEADER_RE = /grade\s*category|grade\s*item|^weight$|^value$|mark\s*details|comment/i;
-  var SKIP_RE = /course\s*total|status|studying|^average$|copyright|fpt university/i;
-  var CAT_HINT = /assignment|progress|practical|final|quiz|lab|midterm|project|resit|fe\b|pe\b|workshop|attendance/i;
+  // OCR: vie+eng (Tesseract.js) — vie hỗ trợ dấu tiếng Việt tốt hơn eng-only
+  var OCR_LANG = 'vie+eng';
+  var ocrWorker = null;
+  var ocrWorkerReady = null;
+
+  var RESIT_RE = /\bresit\b|thi\s*l[aạ]i|retake|h[oọ]c\s*l[aạ]i/i;
+  var HEADER_RE =
+    /grade\s*category|grade\s*item|^weight$|^value$|mark\s*details|comment|th[aà]nh\s*ph[aầ]n|tr[oọ]ng\s*s[oố]|gi[aá]\s*tr[iị]|t[eê]n\s*m[oô]n|đi[eể]m/i;
+  var SKIP_RE =
+    /course\s*total|status|studying|^average$|copyright|fpt university|t[oổ]ng\s*k[eế]t|tr[aạ]ng\s*th[aá]i|đang\s*h[oọ]c|đi[eể]m\s*trung\s*b[iì]nh/i;
+  var CAT_HINT =
+    /assignment|progress|practical|final|quiz|lab|midterm|project|resit|fe\b|pe\b|workshop|attendance|b[aà]i\s*t[aậ]p|ki[eể]m\s*tra|th[iị]\s*cu[oố]i|th[iị]\s*gi[uữ]a|th[ự]c\s*h[à]nh|l[yý]\s*thuy[eế]t|chuy[eê]n\s*c[aầ]n|đi[eể]m\s*danh|thuy[eế]t\s*tr[iì]nh/i;
   var ITEM_H = 48;
 
   var rows = [];
@@ -512,11 +520,15 @@
 
       var item = before.replace(/^[\-·•\d.)\s]+/, '').trim();
       var category = lastCat;
-      var cm = item.match(/^(Assignment|Progress\s*test|Practical\s*Exam|Final\s*Exam(?:\s*Resit)?|Lab|Quiz|Project)\b/i);
+      var cm = item.match(
+        /^(Assignment|Progress\s*test|Practical\s*Exam|Final\s*Exam(?:\s*Resit)?|Lab|Quiz|Project|B[aà]i\s*t[aậ]p|Ki[eể]m\s*tra|Th[iị]\s*cu[oố]i(?:\s*k[yỳ])?(?:\s*l[aạ]i)?|Th[ự]c\s*h[à]nh)\b/i
+      );
       if (cm) {
         category = cm[0];
         lastCat = category;
       }
+      // Total / Tổng
+      if (/^(total|t[oổ]ng)$/i.test(item)) item = 'Total';
       if (!item && li > 0) {
         var p = lines[li - 1];
         if (p && !/(\d)\s*%/.test(p) && !HEADER_RE.test(p) && !SKIP_RE.test(p)) item = p;
@@ -678,17 +690,58 @@
     });
   }
 
+  /**
+   * Worker vie+eng — tái dùng cho lần OCR sau (không tải model lại).
+   * vie: dấu tiếng Việt; eng: header FAP (Weight, Assignment, …)
+   */
+  function getOcrWorker() {
+    if (ocrWorkerReady) return ocrWorkerReady;
+    if (!window.Tesseract || !Tesseract.createWorker) {
+      ocrWorkerReady = Promise.reject(new Error('no-tesseract'));
+      return ocrWorkerReady;
+    }
+    ocrWorkerReady = (async function () {
+      setStatus('Đang tải OCR tiếng Việt + Anh (lần đầu ~ vài MB)…', 'wait');
+      setBar(5);
+      var worker = await Tesseract.createWorker(OCR_LANG, 1, {
+        logger: function (m) {
+          if (!m) return;
+          if (m.status === 'loading language traineddata' && m.progress != null) {
+            setBar(5 + m.progress * 25);
+            setStatus('Tải model tiếng Việt… ' + Math.round(m.progress * 100) + '%', 'wait');
+          } else if (m.status === 'initializing api') {
+            setStatus('Khởi tạo OCR…', 'wait');
+            setBar(32);
+          } else if (m.status === 'recognizing text' && m.progress != null) {
+            setBar(40 + m.progress * 55);
+            setStatus('Đang đọc… ' + Math.round(m.progress * 100) + '%', 'wait');
+          }
+        },
+      });
+      // Ưu tiên layout theo dòng (bảng điểm)
+      try {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '6', // Assume a single uniform block of text
+          preserve_interword_spaces: '1',
+        });
+      } catch (e) {}
+      ocrWorker = worker;
+      return worker;
+    })();
+    return ocrWorkerReady;
+  }
+
   async function runOcr(file) {
     var btn = document.getElementById('btnPick');
     btn.disabled = true;
     var thumb = document.getElementById('thumb');
     thumb.src = URL.createObjectURL(file);
     thumb.classList.add('on');
-    setStatus('Đang đọc ảnh…', 'wait');
-    setBar(8);
+    setStatus('Đang chuẩn bị ảnh…', 'wait');
+    setBar(4);
 
     if (!window.Tesseract) {
-      setStatus('Không tải được OCR. Cần mạng lần đầu.', 'err');
+      setStatus('Không tải được OCR. Cần mạng (CDN) lần đầu.', 'err');
       btn.disabled = false;
       setBar(null);
       return;
@@ -696,31 +749,60 @@
 
     var blob = await prepImage(file);
     try {
-      var result = await Tesseract.recognize(blob, 'eng', {
-        logger: function (m) {
-          if (m.status === 'recognizing text' && m.progress != null) {
-            setBar(10 + m.progress * 85);
-            setStatus('Đang đọc… ' + Math.round(m.progress * 100) + '%', 'wait');
-          }
-        },
-      });
+      var worker = await getOcrWorker();
+      setStatus('Đang đọc (Việt + Anh)…', 'wait');
+      var result = await worker.recognize(blob);
       var text = (result && result.data && result.data.text) || '';
       var parsed = parseText(text);
       if (!parsed.length) {
-        setStatus('Chưa đọc được bảng. Thử ảnh rõ hơn, đủ cột Weight (10.0 %).', 'err');
+        setStatus(
+          'Chưa đọc được bảng. Chụp rõ, đủ cột trọng số / Weight (vd 10.0 %).',
+          'err'
+        );
         setBar(null);
         btn.disabled = false;
         return;
       }
       rows = parsed;
       setBar(100);
-      setStatus('Xong — ' + scorable().length + ' thành phần. Chạm 「Nhập」 để gõ điểm.', 'ok');
+      setStatus(
+        'Xong — ' + scorable().length + ' thành phần. Chạm 「Nhập」 để gõ điểm.',
+        'ok'
+      );
       render();
       document.getElementById('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
       console.error(e);
-      setStatus('Lỗi OCR. Thử ảnh khác.', 'err');
-      setBar(null);
+      // Fallback one-shot eng+vie nếu worker fail
+      try {
+        setStatus('Thử lại OCR…', 'wait');
+        var result2 = await Tesseract.recognize(blob, OCR_LANG, {
+          logger: function (m) {
+            if (m.status === 'recognizing text' && m.progress != null) {
+              setBar(40 + m.progress * 55);
+            }
+          },
+        });
+        var text2 = (result2 && result2.data && result2.data.text) || '';
+        var parsed2 = parseText(text2);
+        if (parsed2.length) {
+          rows = parsed2;
+          setBar(100);
+          setStatus(
+            'Xong — ' + scorable().length + ' thành phần. Chạm 「Nhập」 để gõ điểm.',
+            'ok'
+          );
+          render();
+          document.getElementById('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          setStatus('Lỗi OCR / không nhận ra bảng. Thử ảnh khác.', 'err');
+          setBar(null);
+        }
+      } catch (e2) {
+        console.error(e2);
+        setStatus('Lỗi OCR. Kiểm tra mạng rồi thử lại.', 'err');
+        setBar(null);
+      }
     }
     btn.disabled = false;
   }
