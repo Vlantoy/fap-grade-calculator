@@ -1,10 +1,14 @@
 /**
  * Vercel Serverless — POST /api/parse-grade
  * Body: { imageBase64, mimeType? }
- * Env: GEMINI_API_KEY (required), GEMINI_MODEL (optional)
+ *
+ * Env:
+ *   GEMINI_API_KEY   — one key
+ *   GEMINI_API_KEYS  — optional comma/newline-separated keys (rotation)
+ *   GEMINI_MODEL     — default gemini-2.5-flash (free tier still works)
  */
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 const PROMPT = `You extract FPT University My FAP "Mark Details" grade table from this screenshot.
 Return ONLY a JSON array (no markdown). Each element:
@@ -20,7 +24,20 @@ Rules:
 
 const hits = new Map();
 const WINDOW_MS = 60 * 1000;
-const MAX_PER_WINDOW = 15;
+const MAX_PER_WINDOW = 20;
+let keyCursor = 0;
+
+function getApiKeys() {
+  const multi = process.env.GEMINI_API_KEYS || '';
+  const single = process.env.GEMINI_API_KEY || '';
+  const fromMulti = multi
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (fromMulti.length) return fromMulti;
+  if (single) return [single];
+  return [];
+}
 
 function clientIp(req) {
   const xf = req.headers['x-forwarded-for'];
@@ -65,7 +82,7 @@ function normalizeRows(arr) {
     if (/^(weight|value|comment)$/i.test(item)) continue;
     if (/course\s*total|status|studying|^average$/i.test(item)) continue;
 
-    let weight = Number(o.weight != null ? o.weight : o.Weight);
+    const weight = Number(o.weight != null ? o.weight : o.Weight);
     if (!Number.isFinite(weight) || weight <= 0 || weight > 100) continue;
 
     const isTotal = !!(o.isTotal || /^total$/i.test(item) || /^tổng$/i.test(item));
@@ -96,16 +113,13 @@ function parseModelJson(text) {
   return normalizeRows(JSON.parse(t));
 }
 
-async function callGemini(imageBase64, mimeType, apiKey) {
-  const model = GEMINI_MODEL;
+async function callGemini(imageBase64, mimeType, apiKey, model) {
   const url =
     'https://generativelanguage.googleapis.com/v1beta/models/' +
     encodeURIComponent(model) +
     ':generateContent?key=' +
     encodeURIComponent(apiKey);
 
-  const mime = mimeType || 'image/jpeg';
-  // Support both snake_case (REST) forms Google accepts
   const body = {
     contents: [
       {
@@ -114,7 +128,7 @@ async function callGemini(imageBase64, mimeType, apiKey) {
           { text: PROMPT },
           {
             inline_data: {
-              mime_type: mime,
+              mime_type: mimeType || 'image/jpeg',
               data: imageBase64,
             },
           },
@@ -147,11 +161,47 @@ async function callGemini(imageBase64, mimeType, apiKey) {
   const parts = data?.candidates?.[0]?.content?.parts || [];
   const text = parts.map((p) => p.text || '').join('');
   if (!text) {
-    // blocked / empty
-    const block = data?.candidates?.[0]?.finishReason || data?.promptFeedback?.blockReason;
+    const block =
+      data?.candidates?.[0]?.finishReason || data?.promptFeedback?.blockReason;
     throw new Error(block ? `Model blocked: ${block}` : 'Empty model response');
   }
   return parseModelJson(text);
+}
+
+async function callWithRotation(imageBase64, mimeType) {
+  const keys = getApiKeys();
+  if (!keys.length) {
+    const err = new Error(
+      'Missing GEMINI_API_KEY on Vercel. Settings → Environment Variables → add key → Redeploy.'
+    );
+    err.status = 500;
+    throw err;
+  }
+
+  const models = [DEFAULT_MODEL, 'gemini-2.5-flash', 'gemini-2.0-flash'].filter(
+    (v, i, a) => a.indexOf(v) === i
+  );
+
+  let lastErr = null;
+  const maxTries = Math.min(keys.length * models.length, 10);
+  for (let t = 0; t < maxTries; t++) {
+    const key = keys[keyCursor % keys.length];
+    keyCursor += 1;
+    const model = models[Math.floor(t / keys.length) % models.length];
+    try {
+      const rows = await callGemini(imageBase64, mimeType, key, model);
+      return { rows, model, keyIndex: (keyCursor - 1) % keys.length };
+    } catch (e) {
+      lastErr = e;
+      const msg = String(e.message || '');
+      const retryable =
+        e.status === 429 ||
+        e.status === 403 ||
+        /quota|rate|limit|exceeded|RESOURCE_EXHAUSTED/i.test(msg);
+      if (!retryable && e.status !== 500) break;
+    }
+  }
+  throw lastErr || new Error('All Gemini keys/models failed');
 }
 
 module.exports = async function handler(req, res) {
@@ -159,17 +209,16 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // Health / debug
   if (req.method === 'GET') {
+    const keys = getApiKeys();
     return res.status(200).json({
       ok: true,
       service: 'parse-grade',
-      hasKey: Boolean(process.env.GEMINI_API_KEY),
-      model: GEMINI_MODEL,
+      hasKey: keys.length > 0,
+      keyCount: keys.length,
+      model: DEFAULT_MODEL,
     });
   }
 
@@ -177,16 +226,8 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const ip = clientIp(req);
-  if (!rateLimit(ip)) {
+  if (!rateLimit(clientIp(req))) {
     return res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({
-      error: 'Missing GEMINI_API_KEY on Vercel. Project → Settings → Environment Variables → add GEMINI_API_KEY → Redeploy.',
-    });
   }
 
   try {
@@ -208,14 +249,18 @@ module.exports = async function handler(req, res) {
       return res.status(413).json({ error: 'Image too large (max ~4MB)' });
     }
 
-    const rows = await callGemini(b64, body.mimeType || 'image/jpeg', apiKey);
-    if (!rows.length) {
+    const result = await callWithRotation(b64, body.mimeType || 'image/jpeg');
+    if (!result.rows.length) {
       return res.status(422).json({
         error: 'Could not parse grade table from image',
         rows: [],
       });
     }
-    return res.status(200).json({ ok: true, rows, model: GEMINI_MODEL });
+    return res.status(200).json({
+      ok: true,
+      rows: result.rows,
+      model: result.model,
+    });
   } catch (e) {
     console.error('[parse-grade]', e);
     const status = e.status >= 400 && e.status < 600 ? e.status : 502;
@@ -225,7 +270,6 @@ module.exports = async function handler(req, res) {
   }
 };
 
-// Vercel / Node function config
 module.exports.config = {
   maxDuration: 60,
   api: {
