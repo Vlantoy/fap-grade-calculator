@@ -3,443 +3,390 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <title>OCR Mark Details — FAP What-if</title>
-  <meta name="description" content="Chụp / upload ảnh Mark Details My FAP → OCR tự nhận thẻ điểm → sửa bằng bánh xe → Average." />
+  <title>Tính điểm FAP — OCR</title>
   <meta name="theme-color" content="#0b1f3a" />
+  <meta name="description" content="Chọn ảnh bảng điểm My FAP → tự đọc → sửa điểm bằng bánh xe → Average." />
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="assets/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="assets/favicon-32.png" />
   <style>
     :root {
       --navy: #0b1f3a;
-      --navy2: #123056;
-      --header: #0f2744;
-      --bg: #e8eef5;
-      --card: #ffffff;
-      --border: #d7dee8;
-      --row-alt: #f7f9fc;
-      --text: #1a2332;
-      --muted: #6b7a90;
-      --value: #1e3a5f;
+      --bg: #eef2f7;
+      --card: #fff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue: #2563eb;
       --green: #16a34a;
-      --accent: #2563eb;
       --danger: #dc2626;
-      --wheel-h: 168px;
-      --item-h: 42px;
+      --item-h: 48px;
+      --wheel-h: 192px;
       --safe-b: env(safe-area-inset-bottom, 0px);
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
+    html, body { margin: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100dvh;
-      line-height: 1.4;
       -webkit-tap-highlight-color: transparent;
     }
-    a { color: var(--accent); text-decoration: none; }
+    a { color: var(--blue); text-decoration: none; }
 
-    .app-bar {
-      position: sticky; top: 0; z-index: 40;
+    .top {
+      position: sticky; top: 0; z-index: 30;
       background: var(--navy); color: #fff;
       display: flex; align-items: center; gap: 8px;
-      padding: 12px; min-height: 52px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.18);
+      padding: 12px 14px;
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
     }
-    .app-bar .back {
-      width: 36px; height: 36px; border-radius: 10px;
-      display: grid; place-items: center; color: #fff; font-size: 1.25rem;
+    .top a {
+      color: #fff; width: 40px; height: 40px;
+      display: grid; place-items: center; font-size: 1.3rem;
+      border-radius: 10px;
     }
-    .app-bar h1 {
+    .top h1 {
       flex: 1; margin: 0; text-align: center;
-      font-size: 1.05rem; font-weight: 600; padding-right: 36px;
+      font-size: 1.05rem; font-weight: 700;
+      padding-right: 40px;
     }
 
     .page {
-      width: min(720px, 100%);
+      width: min(480px, 100%);
       margin: 0 auto;
-      padding: 14px 12px calc(24px + var(--safe-b));
+      padding: 16px 14px calc(20px + var(--safe-b));
     }
 
-    .hint {
-      font-size: 0.84rem; color: var(--muted);
-      margin: 0 0 12px; padding: 0 2px;
-    }
-    .hint strong { color: var(--text); }
-
-    /* ===== OCR dropzone (PRIMARY) ===== */
-    .ocr-card {
+    /* STEP 1 — one big action */
+    .hero {
       background: var(--card);
-      border: 2px dashed #94a3b8;
-      border-radius: 16px;
-      padding: 18px 14px;
+      border-radius: 20px;
+      padding: 28px 18px 22px;
       text-align: center;
-      box-shadow: 0 8px 28px rgba(15,39,68,.06);
-      transition: border-color .15s, background .15s;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
+      border: 1px solid var(--border);
     }
-    .ocr-card.drag { border-color: var(--accent); background: #eff6ff; }
-    .ocr-card.has-table { border-style: solid; border-color: #e6ebf2; padding: 12px; }
-    .ocr-title { font-weight: 800; font-size: 1.05rem; margin: 0 0 6px; }
-    .ocr-sub { font-size: 0.85rem; color: var(--muted); margin: 0 0 14px; }
-    .ocr-actions {
-      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+    .hero .emoji { font-size: 2.5rem; line-height: 1; margin-bottom: 10px; }
+    .hero h2 {
+      margin: 0 0 8px; font-size: 1.2rem; font-weight: 800;
     }
-    .btn {
-      appearance: none; border: 1px solid var(--border);
-      background: #fff; color: var(--text);
-      border-radius: 12px; padding: 12px 14px;
-      font-size: 0.9rem; font-weight: 700; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 6px;
+    .hero p {
+      margin: 0 0 20px; color: var(--muted); font-size: 0.92rem; line-height: 1.45;
     }
-    .btn:hover { background: #f1f5f9; }
-    .btn-primary {
-      background: var(--navy); border-color: var(--navy); color: #fff;
+    .btn-big {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%;
+      border: 0;
+      background: var(--navy);
+      color: #fff;
+      font: inherit;
+      font-size: 1.05rem;
+      font-weight: 700;
+      padding: 18px 16px;
+      border-radius: 16px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(11, 31, 58, .25);
     }
-    .btn-primary:hover { background: var(--navy2); }
-    .btn:disabled { opacity: .55; cursor: not-allowed; }
-    .btn-ghost { background: transparent; }
+    .btn-big:active { transform: scale(0.98); }
+    .btn-big:disabled { opacity: .55; cursor: wait; }
+    .btn-big.secondary {
+      margin-top: 10px;
+      background: #fff;
+      color: var(--navy);
+      border: 2px solid var(--navy);
+      box-shadow: none;
+      padding: 14px 16px;
+      font-size: 0.95rem;
+    }
 
-    .preview-wrap {
-      margin-top: 12px; display: none;
-    }
-    .preview-wrap.show { display: block; }
-    .preview-wrap img {
-      max-width: 100%; max-height: 180px;
-      border-radius: 10px; border: 1px solid var(--border);
-      object-fit: contain; background: #f8fafc;
-    }
-
-    .ocr-status {
-      margin-top: 12px;
-      font-size: 0.86rem;
+    .status {
+      margin-top: 14px;
+      font-size: 0.9rem;
       color: var(--muted);
-      min-height: 1.3em;
+      min-height: 1.4em;
     }
-    .ocr-status.err { color: var(--danger); font-weight: 600; }
-    .ocr-status.ok { color: var(--green); font-weight: 600; }
-    .progress {
-      margin-top: 10px; height: 6px; border-radius: 999px;
+    .status.ok { color: var(--green); font-weight: 700; }
+    .status.err { color: var(--danger); font-weight: 700; }
+    .status.wait { color: var(--blue); font-weight: 600; }
+
+    .bar {
+      margin-top: 12px; height: 8px; border-radius: 99px;
       background: #e2e8f0; overflow: hidden; display: none;
     }
-    .progress.show { display: block; }
-    .progress > i {
-      display: block; height: 100%; width: 0%;
-      background: linear-gradient(90deg, #0284c7, #22c55e);
+    .bar.on { display: block; }
+    .bar > i {
+      display: block; height: 100%; width: 0;
+      background: linear-gradient(90deg, #2563eb, #22c55e);
       transition: width .2s;
     }
 
-    .raw-toggle {
-      margin-top: 8px; font-size: 0.8rem; color: var(--accent);
-      background: none; border: 0; cursor: pointer; font-weight: 600;
+    .thumb {
       display: none;
+      margin-top: 14px;
+      border-radius: 12px;
+      max-width: 100%;
+      max-height: 140px;
+      object-fit: contain;
+      border: 1px solid var(--border);
+      background: #f8fafc;
     }
-    .raw-toggle.show { display: inline; }
-    .raw-box {
-      display: none; margin-top: 8px; text-align: left;
-      background: #0f172a; color: #cbd5e1;
-      font: 11px/1.4 ui-monospace, monospace;
-      padding: 10px; border-radius: 10px;
-      max-height: 160px; overflow: auto; white-space: pre-wrap;
+    .thumb.on { display: inline-block; }
+
+    /* STEP 2 — results */
+    .panel { display: none; margin-top: 16px; }
+    .panel.on { display: block; }
+
+    .avg-sticky {
+      position: sticky; top: 56px; z-index: 20;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .08);
     }
-    .raw-box.show { display: block; }
-
-    /* Table after OCR */
-    .table-section { display: none; margin-top: 14px; }
-    .table-section.show { display: block; }
-
-    .course-bar { margin-bottom: 10px; }
-    .course-bar input {
-      width: 100%; border: 1px solid var(--border);
-      background: var(--card); border-radius: 12px;
-      padding: 10px 12px; font-size: 0.95rem; font-weight: 600;
+    .avg-sticky .l { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+    .avg-sticky .n {
+      font-size: 2rem; font-weight: 800; color: var(--green);
+      font-variant-numeric: tabular-nums; line-height: 1;
+    }
+    .avg-sticky .tag {
+      background: #eff6ff; color: #1d4ed8;
+      font-weight: 800; padding: 6px 12px; border-radius: 999px;
     }
 
-    .mark-card {
+    .tip {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.86rem;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .list {
       background: var(--card);
       border-radius: 16px;
-      box-shadow: 0 8px 28px rgba(15,39,68,.08);
-      overflow: hidden; border: 1px solid #e6ebf2;
+      border: 1px solid var(--border);
+      overflow: hidden;
     }
-    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table.marks {
-      width: 100%; border-collapse: collapse;
-      min-width: 480px; font-size: 0.88rem;
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px 12px;
+      padding: 14px 14px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
     }
-    table.marks thead th {
-      background: var(--header); color: #fff;
-      font-weight: 600; text-align: left;
-      padding: 11px 10px; white-space: nowrap; font-size: 0.84rem;
+    .row:last-child { border-bottom: 0; }
+    .row.total {
+      background: #f8fafc;
+      opacity: .75;
     }
-    table.marks tbody td {
-      padding: 10px; border-bottom: 1px solid var(--border);
-      vertical-align: middle; background: var(--card);
+    .row .name {
+      font-weight: 700;
+      font-size: 0.95rem;
     }
-    table.marks tbody tr:nth-child(even) td { background: var(--row-alt); }
-    table.marks tr.is-total td { color: var(--muted); font-style: italic; }
-    table.marks tr.is-avg td {
-      background: #f0f6ff !important; font-weight: 700;
+    .row .meta {
+      grid-column: 1;
+      font-size: 0.8rem;
+      color: var(--muted);
     }
-    table.marks td.weight {
-      white-space: nowrap; color: var(--muted);
+    .row .tap {
+      grid-row: 1 / span 2;
+      grid-column: 2;
+      min-width: 72px;
+      min-height: 48px;
+      border: 2px solid #93c5fd;
+      background: #eff6ff;
+      border-radius: 14px;
+      font: inherit;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--navy);
       font-variant-numeric: tabular-nums;
+      cursor: pointer;
     }
-    table.marks td.value {
-      text-align: right; font-weight: 700;
-      font-variant-numeric: tabular-nums; min-width: 72px;
+    .row .tap.empty {
+      color: #64748b;
+      font-size: 0.85rem;
+      font-weight: 700;
+      border-style: dashed;
+      border-color: #cbd5e1;
+      background: #f8fafc;
     }
-    .val-btn {
-      appearance: none; border: 0; background: transparent;
-      color: inherit; font: inherit; font-weight: 700;
-      cursor: pointer; padding: 6px 8px; border-radius: 8px;
-      min-width: 48px; text-align: right;
+    .row .tap:active { transform: scale(0.97); }
+    .row.total .tap { display: none; }
+
+    .actions {
+      display: flex; gap: 8px; margin-top: 12px;
     }
-    .val-btn.empty { color: #94a3b8; font-weight: 500; }
-    .val-btn:hover { background: rgba(37,99,235,.1); }
-    .tools {
-      display: flex; flex-wrap: wrap; gap: 8px;
-      padding: 12px; border-top: 1px solid var(--border); background: #fafbfd;
+    .actions button {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 12px;
+      padding: 12px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
     }
 
-    .result {
-      margin-top: 12px;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-    }
-    @media (max-width: 480px) { .result { grid-template-columns: 1fr; } }
-    .result .box {
-      background: var(--card); border: 1px solid #e6ebf2;
-      border-radius: 14px; padding: 14px 16px;
-    }
-    .result .label {
-      font-size: 0.75rem; color: var(--muted); font-weight: 700;
-      text-transform: uppercase; letter-spacing: .04em;
-    }
-    .result .big {
-      font-size: 1.85rem; font-weight: 800; margin-top: 4px;
-      font-variant-numeric: tabular-nums;
-    }
-    .letter {
-      display: inline-block; background: #eff6ff; color: #1d4ed8;
-      padding: 2px 8px; border-radius: 999px; font-weight: 700; font-size: 0.9rem;
+    .foot {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 0.78rem;
+      color: var(--muted);
     }
 
-    .footer-note {
-      margin-top: 16px; font-size: 0.78rem; color: var(--muted); text-align: center;
-    }
-
-    /* Wheel sheet */
-    .overlay {
+    /* sheet */
+    .mask {
       position: fixed; inset: 0; z-index: 100;
-      background: rgba(15,23,42,.45);
-      opacity: 0; pointer-events: none; transition: opacity .2s;
+      background: rgba(15,23,42,.5);
+      opacity: 0; pointer-events: none; transition: .2s;
     }
-    .overlay.open { opacity: 1; pointer-events: auto; }
+    .mask.on { opacity: 1; pointer-events: auto; }
     .sheet {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 110;
-      background: #fff; border-radius: 18px 18px 0 0;
+      background: #fff;
+      border-radius: 20px 20px 0 0;
       transform: translateY(110%);
-      transition: transform .28s cubic-bezier(.2,.8,.2,1);
-      padding-bottom: var(--safe-b); max-height: 78vh;
+      transition: transform .25s ease;
+      padding-bottom: var(--safe-b);
     }
-    .sheet.open { transform: translateY(0); }
-    .sheet-head {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px 8px; border-bottom: 1px solid #f1f5f9;
+    .sheet.on { transform: translateY(0); }
+    .sheet .hd {
+      text-align: center;
+      padding: 16px 16px 4px;
+      font-weight: 800;
+      font-size: 1rem;
     }
-    .sheet-head .title { font-weight: 700; }
-    .sheet-head button {
-      border: 0; background: transparent; font: inherit;
-      font-weight: 700; color: var(--accent); cursor: pointer; padding: 8px;
+    .sheet .sub {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 0 16px 4px;
     }
-    .sheet-sub { text-align: center; font-size: 0.8rem; color: var(--muted); }
-    .preview-score {
-      text-align: center; font-size: 2rem; font-weight: 800;
-      font-variant-numeric: tabular-nums; padding: 8px 0;
+    .sheet .big {
+      text-align: center;
+      font-size: 2.4rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      padding: 4px 0 8px;
     }
     .wheels {
       display: flex; justify-content: center; align-items: stretch;
-      gap: 4px; padding: 8px 20px 16px; position: relative;
+      gap: 6px; padding: 0 20px 12px; position: relative; height: var(--wheel-h);
     }
-    .selection-bar {
-      position: absolute; left: 24px; right: 24px; top: 50%;
+    .sel {
+      position: absolute; left: 18%; right: 18%; top: 50%;
       height: var(--item-h); margin-top: calc(var(--item-h) / -2);
-      border-radius: 12px; background: rgba(37,99,235,.1);
-      border: 1.5px solid rgba(37,99,235,.35); pointer-events: none; z-index: 0;
+      border-radius: 14px;
+      background: rgba(37,99,235,.1);
+      border: 2px solid rgba(37,99,235,.35);
+      pointer-events: none;
     }
-    .wheel-col {
-      width: 72px; height: var(--wheel-h);
-      overflow-y: auto; scroll-snap-type: y mandatory;
-      -webkit-overflow-scrolling: touch; scrollbar-width: none;
-      position: relative; z-index: 1;
-      mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
-      -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+    .col {
+      width: 80px; height: var(--wheel-h);
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      mask-image: linear-gradient(#0000, #000 20%, #000 80%, #0000);
     }
-    .wheel-col::-webkit-scrollbar { display: none; }
-    .wheel-dot {
-      width: 24px; display: flex; align-items: center; justify-content: center;
-      font-size: 1.5rem; font-weight: 800; color: var(--muted); z-index: 1;
+    .col::-webkit-scrollbar { display: none; }
+    .dot {
+      width: 20px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; font-weight: 800; color: #94a3b8;
     }
-    .wheel-item {
-      height: var(--item-h); display: flex; align-items: center; justify-content: center;
-      font-size: 1.35rem; font-weight: 700; color: #94a3b8;
-      scroll-snap-align: center; font-variant-numeric: tabular-nums;
+    .it {
+      height: var(--item-h);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; font-weight: 700; color: #94a3b8;
+      scroll-snap-align: center;
     }
-    .empty-pad { height: calc(var(--item-h) * 2); flex-shrink: 0; }
-    .sheet-actions { display: flex; gap: 8px; padding: 0 16px 16px; }
-    .sheet-actions .btn { flex: 1; justify-content: center; }
-
-    /* Live camera */
-    .cam-overlay {
-      position: fixed; inset: 0; z-index: 200;
-      background: #000;
-      display: none; flex-direction: column;
+    .pad { height: calc((var(--wheel-h) - var(--item-h)) / 2); }
+    .sheet .btns {
+      display: flex; gap: 10px;
+      padding: 8px 16px 16px;
     }
-    .cam-overlay.open { display: flex; }
-    .cam-top {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 14px; padding-top: calc(12px + env(safe-area-inset-top, 0px));
-      color: #fff; background: rgba(0,0,0,.55); z-index: 2;
+    .sheet .btns button {
+      flex: 1; border: 0; border-radius: 14px;
+      padding: 16px; font: inherit; font-weight: 800; font-size: 1rem;
+      cursor: pointer;
     }
-    .cam-top button {
-      border: 0; background: rgba(255,255,255,.15); color: #fff;
-      font: inherit; font-weight: 700; padding: 10px 14px; border-radius: 10px; cursor: pointer;
-    }
-    .cam-video-wrap {
-      flex: 1; position: relative; display: flex; align-items: center; justify-content: center;
-      overflow: hidden; background: #000;
-    }
-    .cam-video-wrap video {
-      width: 100%; height: 100%; object-fit: cover;
-    }
-    .cam-hint {
-      position: absolute; left: 12px; right: 12px; top: 12px;
-      text-align: center; color: #fff; font-size: 0.85rem; font-weight: 600;
-      text-shadow: 0 1px 4px #000; pointer-events: none;
-    }
-    .cam-bottom {
-      padding: 16px 20px calc(20px + env(safe-area-inset-bottom, 0px));
-      display: flex; justify-content: center; align-items: center;
-      background: rgba(0,0,0,.65); gap: 24px;
-    }
-    .cam-shutter {
-      width: 72px; height: 72px; border-radius: 50%;
-      border: 4px solid #fff; background: rgba(255,255,255,.25);
-      cursor: pointer; padding: 0;
-    }
-    .cam-shutter:active { background: #fff; }
-    .cam-shutter:disabled { opacity: .4; }
+    .sheet .ok { background: var(--navy); color: #fff; }
+    .sheet .clear { background: #f1f5f9; color: var(--muted); }
   </style>
 </head>
 <body>
-  <header class="app-bar">
-    <a class="back" href="index.html" aria-label="Back">←</a>
-    <h1>Mark Details</h1>
+  <header class="top">
+    <a href="index.html" aria-label="Back">←</a>
+    <h1>Tính điểm FAP</h1>
   </header>
 
   <main class="page">
-    <p class="hint">
-      <strong>Bước 1:</strong> Chụp / upload ảnh bảng điểm My FAP (Mark Details).<br />
-      <strong>Bước 2:</strong> OCR tự nhận thẻ (category, item, weight, value).<br />
-      <strong>Bước 3:</strong> Chạm Value → bánh xe sửa what-if → Average.
-    </p>
-
-    <section class="ocr-card" id="ocrCard">
-      <p class="ocr-title">📷 Ảnh Mark Details</p>
-      <p class="ocr-sub">
-        Chụp full bảng (Grade category → Value). Crop gọn, chữ rõ = OCR chính xác hơn.
+    <!-- ONE primary action -->
+    <section class="hero" id="hero">
+      <div class="emoji">📸</div>
+      <h2>Chọn ảnh bảng điểm</h2>
+      <p>
+        Vào My FAP → Mark Details → chụp màn hình hoặc chọn ảnh đã lưu.<br />
+        Máy sẽ <strong>tự đọc</strong> các thành phần điểm.
       </p>
-      <div class="ocr-actions">
-        <button type="button" class="btn btn-primary" id="btnCamera">📷 Chụp ảnh</button>
-        <button type="button" class="btn" id="btnGallery">🖼 Thư viện</button>
-        <!-- capture: fallback OS camera; gallery: no capture -->
-        <input type="file" id="fileCamera" accept="image/*" capture="environment" hidden />
-        <input type="file" id="fileGallery" accept="image/*,.heic,.heif" hidden />
-      </div>
-      <div class="preview-wrap" id="previewWrap">
-        <img id="previewImg" alt="Preview ảnh OCR" />
-      </div>
-      <div class="progress" id="progress"><i id="progressBar"></i></div>
-      <div class="ocr-status" id="ocrStatus">Chưa có ảnh — chọn hoặc kéo thả vào đây.</div>
-      <button type="button" class="raw-toggle" id="rawToggle">Xem text OCR thô</button>
-      <pre class="raw-box" id="rawBox"></pre>
+      <button type="button" class="btn-big" id="btnPick">
+        Chọn / chụp ảnh
+      </button>
+      <input type="file" id="file" accept="image/*" hidden />
+      <div class="status" id="status"></div>
+      <div class="bar" id="bar"><i id="barFill"></i></div>
+      <img class="thumb" id="thumb" alt="" />
     </section>
 
-    <section class="table-section" id="tableSection">
-      <div class="course-bar">
-        <input type="text" id="courseName" placeholder="Tên môn (tuỳ chọn)" autocomplete="off" />
-      </div>
-      <div class="mark-card">
-        <div class="table-scroll">
-          <table class="marks">
-            <thead>
-              <tr>
-                <th>Grade category</th>
-                <th>Grade item</th>
-                <th>Weight</th>
-                <th>Value</th>
-              </tr>
-            </thead>
-            <tbody id="marksBody"></tbody>
-          </table>
+    <section class="panel" id="panel">
+      <div class="avg-sticky">
+        <div>
+          <div class="l">Average (what-if)</div>
+          <div class="n" id="avg">0.0</div>
         </div>
-        <div class="tools">
-          <button type="button" class="btn" id="btnReocr">OCR ảnh khác</button>
-          <button type="button" class="btn btn-ghost" id="btnClearVals">Xóa điểm what-if</button>
-        </div>
+        <div class="tag" id="letter">—</div>
       </div>
 
-      <div class="result">
-        <div class="box">
-          <div class="label">Average</div>
-          <div class="big" id="avgDisplay">0.0</div>
-        </div>
-        <div class="box">
-          <div class="label">Letter</div>
-          <div class="big"><span class="letter" id="letterDisplay">—</span></div>
-        </div>
+      <div class="tip">Chạm ô xanh bên phải để nhập / sửa điểm (kéo bánh xe).</div>
+
+      <div class="list" id="list"></div>
+
+      <div class="actions">
+        <button type="button" id="btnAgain">Ảnh khác</button>
+        <button type="button" id="btnClear">Xóa hết điểm</button>
       </div>
     </section>
 
-    <p class="footer-note">
-      OCR chạy <strong>trên máy bạn</strong> (Tesseract.js) · không gửi ảnh lên server ·
+    <p class="foot">
+      Ảnh xử lý trên máy bạn · không gửi server ·
       <a href="index.html">Trang chủ</a>
     </p>
   </main>
 
-  <!-- Live camera (getUserMedia) -->
-  <div class="cam-overlay" id="camOverlay" aria-hidden="true">
-    <div class="cam-top">
-      <button type="button" id="camClose">Đóng</button>
-      <span style="font-weight:700">Chụp bảng điểm</span>
-      <button type="button" id="camFlip" title="Đổi camera">⇄</button>
-    </div>
-    <div class="cam-video-wrap">
-      <video id="camVideo" playsinline autoplay muted></video>
-      <div class="cam-hint">Canh đủ 4 cột Weight / Value · chữ rõ</div>
-    </div>
-    <div class="cam-bottom">
-      <button type="button" class="cam-shutter" id="camShutter" aria-label="Chụp"></button>
-    </div>
-  </div>
-
-  <div class="overlay" id="overlay" hidden></div>
-  <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true">
-    <div class="sheet-head">
-      <button type="button" id="sheetCancel">Hủy</button>
-      <div class="title">Nhập điểm</div>
-      <button type="button" id="sheetDone">Xong</button>
-    </div>
-    <div class="sheet-sub" id="sheetSub"></div>
-    <div class="preview-score" id="sheetPreview">0.0</div>
+  <div class="mask" id="mask"></div>
+  <div class="sheet" id="sheet">
+    <div class="hd" id="sheetTitle">Nhập điểm</div>
+    <div class="sub" id="sheetSub"></div>
+    <div class="big" id="sheetBig">0.0</div>
     <div class="wheels">
-      <div class="selection-bar"></div>
-      <div class="wheel-col" id="wheelInt"></div>
-      <div class="wheel-dot">.</div>
-      <div class="wheel-col" id="wheelDec"></div>
+      <div class="sel"></div>
+      <div class="col" id="wInt"></div>
+      <div class="dot">.</div>
+      <div class="col" id="wDec"></div>
     </div>
-    <div class="sheet-actions">
-      <button type="button" class="btn" id="sheetClear">Để trống</button>
-      <button type="button" class="btn btn-primary" id="sheetOk">Áp dụng</button>
+    <div class="btns">
+      <button type="button" class="clear" id="btnEmpty">Trống</button>
+      <button type="button" class="ok" id="btnOk">Xong</button>
     </div>
   </div>
 
@@ -449,37 +396,25 @@
   'use strict';
 
   var RESIT_RE = /\bresit\b|thi\s*l[aạ]i|retake/i;
-  var HEADER_RE = /grade\s*category|grade\s*item|weight|value|mark\s*details|comment/i;
-  var SKIP_LINE_RE = /course\s*total|status|studying|average|^no\.?$|copyright|fpt/i;
-  var CAT_HINT =
-    /assignment|progress|practical|final|quiz|lab|midterm|presentation|workshop|attendance|participation|project|fe\b|pe\b|resit|thi\s*l/i;
-  var ITEM_H = 42;
+  var HEADER_RE = /grade\s*category|grade\s*item|^weight$|^value$|mark\s*details|comment/i;
+  var SKIP_RE = /course\s*total|status|studying|^average$|copyright|fpt university/i;
+  var CAT_HINT = /assignment|progress|practical|final|quiz|lab|midterm|project|resit|fe\b|pe\b|workshop|attendance/i;
+  var ITEM_H = 48;
 
-  /** @type {{id:string, category:string, item:string, weight:number, value:number|null, isTotal:boolean}[]} */
   var rows = [];
   var editId = null;
-  var snapTimers = { int: null, dec: null };
-  var lastFile = null;
+  var timers = { i: null, d: null };
 
-  function uid() {
-    return 'r' + Math.random().toString(36).slice(2, 9);
+  function uid() { return 'r' + Math.random().toString(36).slice(2, 9); }
+  function isResit(s) { return RESIT_RE.test(s || ''); }
+  function baseKey(n) {
+    return String(n || '').toLowerCase().replace(RESIT_RE, ' ').replace(/[:\-_|]/g, ' ').replace(/\s+/g, ' ').trim();
   }
-  function isResit(s) {
-    return RESIT_RE.test(s || '');
-  }
-  function baseKey(name) {
-    return String(name || '')
-      .toLowerCase()
-      .replace(RESIT_RE, ' ')
-      .replace(/[:\-_|]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-  function clampScore(v) {
+  function clamp(v) {
     if (v == null || !isFinite(v)) return null;
     return Math.min(10, Math.max(0, Math.round(v * 10) / 10));
   }
-  function letterOf(m) {
+  function letter(m) {
     if (m == null || !isFinite(m)) return '—';
     if (m >= 9) return 'A+';
     if (m >= 8.5) return 'A';
@@ -492,14 +427,10 @@
     return 'F';
   }
   function fmt(v) {
-    if (v == null) return '—';
-    return (Math.round(v * 10) / 10).toFixed(1);
+    return v == null ? '' : (Math.round(v * 10) / 10).toFixed(1);
   }
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   function scorable() {
@@ -508,138 +439,81 @@
     });
   }
 
-  function calcAverage() {
-    var comps = scorable();
-    var resitOn = {};
-    comps.forEach(function (c) {
-      if (isResit(c.item) && c.value != null) resitOn[baseKey(c.item)] = true;
+  function avg() {
+    var c = scorable();
+    var on = {};
+    c.forEach(function (x) {
+      if (isResit(x.item) && x.value != null) on[baseKey(x.item)] = true;
     });
-    var sum = 0;
-    comps.forEach(function (c) {
-      if (isResit(c.item)) {
-        if (c.value == null) return;
-        sum += (c.value * c.weight) / 100;
+    var s = 0;
+    c.forEach(function (x) {
+      if (isResit(x.item)) {
+        if (x.value == null) return;
+        s += (x.value * x.weight) / 100;
         return;
       }
-      if (resitOn[baseKey(c.item)]) return;
-      sum += ((c.value == null ? 0 : c.value) * c.weight) / 100;
+      if (on[baseKey(x.item)]) return;
+      s += ((x.value == null ? 0 : x.value) * x.weight) / 100;
     });
-    return Math.round(sum * 100) / 100;
+    return Math.round(s * 100) / 100;
   }
 
-  // ---------- OCR parse ----------
-  function cleanOcrText(text) {
-    return String(text || '')
+  /* ---- OCR parse ---- */
+  function clean(t) {
+    return String(t || '')
       .replace(/\u00a0/g, ' ')
       .replace(/[|¦]/g, ' ')
-      .replace(/(\d)\s*[oO]\s*%/g, '$1.0 %') // 10 o % weirdness
-      .replace(/(\d)[, ](\d)\s*%/g, '$1.$2 %')
-      .replace(/(\d)\s+\.\s*(\d)/g, '$1.$2');
+      .replace(/(\d)\s*[oO]\s*%/g, '$1.0 %')
+      .replace(/(\d)[, ](\d)\s*%/g, '$1.$2 %');
   }
 
-  /**
-   * Parse FAP Mark Details OCR text into rows.
-   * Strategy: every weight "X.X %" is a component; text before = item; optional value after.
-   */
-  function parseMarkDetailsText(raw) {
-    var text = cleanOcrText(raw);
-    var lines = text
-      .split(/\r?\n/)
-      .map(function (l) {
-        return l.replace(/\s+/g, ' ').trim();
-      })
-      .filter(Boolean);
+  function parseText(raw) {
+    var text = clean(raw);
+    var lines = text.split(/\r?\n/).map(function (l) {
+      return l.replace(/\s+/g, ' ').trim();
+    }).filter(Boolean);
 
-    // Also flatten for multi-line items
-    var flat = lines.join('\n');
-
-    var WEIGHT_RE = /(\d{1,2}(?:[.,]\d+)?)\s*%/g;
+    var WRE = /(\d{1,2}(?:[.,]\d+)?)\s*%/g;
     var found = [];
-    var m;
-    var searchIn = lines.join(' · '); // single stream with separators
+    var lastCat = '';
 
-    // Work line by line first
-    var lastCategory = '';
     for (var li = 0; li < lines.length; li++) {
       var line = lines[li];
-      if (HEADER_RE.test(line) && !WEIGHT_RE.test(line)) continue;
-      if (SKIP_LINE_RE.test(line) && !/resit/i.test(line)) continue;
+      if (HEADER_RE.test(line) && !WRE.test(line)) continue;
+      if (SKIP_RE.test(line) && !/resit/i.test(line)) continue;
 
-      WEIGHT_RE.lastIndex = 0;
-      var wm = WEIGHT_RE.exec(line);
+      WRE.lastIndex = 0;
+      var wm = WRE.exec(line);
       if (!wm) {
-        // category-only line?
-        if (CAT_HINT.test(line) && line.length < 40 && !/\d/.test(line)) {
-          lastCategory = line;
-        }
+        if (CAT_HINT.test(line) && line.length < 42 && !/\d{2}/.test(line)) lastCat = line;
         continue;
       }
-
       var weight = parseFloat(wm[1].replace(',', '.'));
-      if (!isFinite(weight) || weight <= 0 || weight > 100) continue;
+      if (!(weight > 0 && weight <= 100)) continue;
 
       var before = line.slice(0, wm.index).trim();
       var after = line.slice(wm.index + wm[0].length).trim();
-
-      // value: number 0-10 after weight
       var value = null;
       var vm = after.match(/^(\d{1,2}(?:[.,]\d+)?)\b/);
       if (vm) {
         var vv = parseFloat(vm[1].replace(',', '.'));
-        if (vv >= 0 && vv <= 10) value = clampScore(vv);
+        if (vv >= 0 && vv <= 10) value = clamp(vv);
       }
 
-      // item name
-      var item = before
-        .replace(/^[\-·•\d.)\s]+/, '')
-        .replace(/\b(grade\s*item|weight|value)\b/gi, '')
-        .trim();
-
-      // pull category if glued
-      var category = lastCategory;
-      var catMatch = item.match(
-        /^(Assignment|Progress\s*test|Practical\s*Exam|Final\s*Exam(?:\s*Resit)?|Lab|Quiz|Project|FE|PE)\b/i
-      );
-      if (catMatch) {
-        category = catMatch[0];
-        // keep item as is or strip duplicate
-        if (item.length < catMatch[0].length + 2) {
-          // item might be same as category
-        }
-        lastCategory = category;
-      } else if (CAT_HINT.test(item) && item.length < 28) {
-        // entire "before" is category; item might be on previous line
-        if (li > 0) {
-          var prev = lines[li - 1];
-          if (prev && !/(\d)\s*%/.test(prev) && !HEADER_RE.test(prev) && prev.length < 48) {
-            if (CAT_HINT.test(prev) || !/\d/.test(prev)) {
-              category = prev;
-              lastCategory = category;
-            } else {
-              item = prev + ' ' + item;
-            }
-          }
-        }
-        if (/^(Assignment|Progress|Practical|Final|Lab)/i.test(item) && item.split(' ').length <= 3) {
-          category = item;
-          lastCategory = category;
-        }
+      var item = before.replace(/^[\-·•\d.)\s]+/, '').trim();
+      var category = lastCat;
+      var cm = item.match(/^(Assignment|Progress\s*test|Practical\s*Exam|Final\s*Exam(?:\s*Resit)?|Lab|Quiz|Project)\b/i);
+      if (cm) {
+        category = cm[0];
+        lastCat = category;
       }
-
-      // previous line as item if before empty
       if (!item && li > 0) {
-        var p2 = lines[li - 1];
-        if (p2 && !/(\d)\s*%/.test(p2) && !HEADER_RE.test(p2) && !SKIP_LINE_RE.test(p2)) {
-          item = p2;
-        }
+        var p = lines[li - 1];
+        if (p && !/(\d)\s*%/.test(p) && !HEADER_RE.test(p) && !SKIP_RE.test(p)) item = p;
       }
-
-      item = item.replace(/\s+/g, ' ').trim() || 'Component';
-      var isTotal = /^total$/i.test(item);
-
-      // skip pure Average 0.0 as component if labeled average
+      item = (item || 'Component').replace(/\s+/g, ' ');
       if (/^average$/i.test(item)) continue;
-
+      var isTotal = /^total$/i.test(item);
       found.push({
         id: uid(),
         category: category || '',
@@ -648,151 +522,122 @@
         value: isTotal ? null : value,
         isTotal: isTotal,
       });
-
-      if (!isTotal && CAT_HINT.test(item)) {
-        lastCategory = item;
-      }
     }
 
-    // Fallback: global weight scan if line parser got almost nothing
     if (found.length < 2) {
-      found = parseMarkDetailsFallback(text);
+      var re = /([A-Za-z][A-Za-z0-9:.\s\-_]{1,40}?)\s+(\d{1,2}(?:[.,]\d+)?)\s*%(?:\s+(\d{1,2}(?:[.,]\d+)?))?/g;
+      var t = clean(raw).replace(/\n/g, ' ');
+      var m;
+      found = [];
+      while ((m = re.exec(t))) {
+        var it = m[1].replace(/\s+/g, ' ').trim();
+        if (HEADER_RE.test(it) || it.length < 2) continue;
+        var w = parseFloat(m[2].replace(',', '.'));
+        if (!(w > 0 && w <= 100)) continue;
+        var val = null;
+        if (m[3] != null) {
+          var x = parseFloat(m[3].replace(',', '.'));
+          if (x >= 0 && x <= 10) val = clamp(x);
+        }
+        found.push({
+          id: uid(),
+          category: '',
+          item: it,
+          weight: w,
+          value: /^total$/i.test(it) ? null : val,
+          isTotal: /^total$/i.test(it),
+        });
+      }
     }
 
-    // Drop header junk weights
-    found = found.filter(function (r) {
-      if (HEADER_RE.test(r.item)) return false;
-      if (/^value$/i.test(r.item)) return false;
-      return true;
-    });
-
-    // Propagate category downward
     var cat = '';
-    for (var i = 0; i < found.length; i++) {
-      if (found[i].category) cat = found[i].category;
-      else found[i].category = cat;
-      // If item looks like category and next has no cat
-      if (!found[i].isTotal && CAT_HINT.test(found[i].item) && found[i].item.length < 30) {
-        // keep
-      }
-    }
-
-    return found;
-  }
-
-  function parseMarkDetailsFallback(text) {
-    var out = [];
-    var re = /([A-Za-z][A-Za-z0-9:.\s\-_]{0,40}?)\s+(\d{1,2}(?:[.,]\d+)?)\s*%(?:\s+(\d{1,2}(?:[.,]\d+)?))?/g;
-    var m;
-    var t = cleanOcrText(text).replace(/\n/g, ' ');
-    while ((m = re.exec(t))) {
-      var item = m[1].replace(/\s+/g, ' ').trim();
-      if (HEADER_RE.test(item) || item.length < 2) continue;
-      var w = parseFloat(m[2].replace(',', '.'));
-      if (!(w > 0 && w <= 100)) continue;
-      var val = null;
-      if (m[3] != null) {
-        var vv = parseFloat(m[3].replace(',', '.'));
-        if (vv >= 0 && vv <= 10) val = clampScore(vv);
-      }
-      out.push({
-        id: uid(),
-        category: '',
-        item: item,
-        weight: w,
-        value: /^total$/i.test(item) ? null : val,
-        isTotal: /^total$/i.test(item),
-      });
-    }
-    return out;
-  }
-
-  // ---------- Render ----------
-  function render() {
-    var body = document.getElementById('marksBody');
-    var section = document.getElementById('tableSection');
-    if (!rows.length) {
-      section.classList.remove('show');
-      return;
-    }
-    section.classList.add('show');
-    document.getElementById('ocrCard').classList.add('has-table');
-
-    var html = '';
-    var lastCat = null;
-    rows.forEach(function (r) {
-      var cls = r.isTotal ? ' is-total' : '';
-      html += '<tr class="' + cls + '">';
-      var catShow = r.category && r.category !== lastCat ? r.category : '';
-      if (r.category) lastCat = r.category;
-      html += '<td class="cat">' + escapeHtml(catShow) + '</td>';
-      html += '<td class="item">' + escapeHtml(r.item) + '</td>';
-      html += '<td class="weight">' + r.weight.toFixed(1) + ' %</td>';
-      html += '<td class="value">';
-      if (r.isTotal) {
-        html += '';
-      } else {
-        var has = r.value != null;
-        html +=
-          '<button type="button" class="val-btn' +
-          (has ? '' : ' empty') +
-          '" data-edit="' +
-          r.id +
-          '">' +
-          (has ? fmt(r.value) : '···') +
-          '</button>';
-      }
-      html += '</td></tr>';
+    found.forEach(function (r) {
+      if (r.category) cat = r.category;
+      else r.category = cat;
     });
-
-    var avg = calcAverage();
-    html +=
-      '<tr class="is-avg"><td class="cat">Course total</td><td>Average</td><td></td><td class="value">' +
-      avg.toFixed(1) +
-      '</td></tr>';
-    html +=
-      '<tr class="is-avg"><td></td><td>Status</td><td></td><td class="value" style="color:#16a34a">Studying</td></tr>';
-
-    body.innerHTML = html;
-    document.getElementById('avgDisplay').textContent = avg.toFixed(1);
-    document.getElementById('letterDisplay').textContent = letterOf(avg);
+    return found.filter(function (r) {
+      return !HEADER_RE.test(r.item);
+    });
   }
 
-  // ---------- Image preprocess + OCR ----------
+  /* ---- UI ---- */
   function setStatus(msg, kind) {
-    var el = document.getElementById('ocrStatus');
-    el.textContent = msg;
-    el.className = 'ocr-status' + (kind ? ' ' + kind : '');
+    var el = document.getElementById('status');
+    el.textContent = msg || '';
+    el.className = 'status' + (kind ? ' ' + kind : '');
   }
-
-  function setProgress(p) {
-    var bar = document.getElementById('progress');
-    var fill = document.getElementById('progressBar');
+  function setBar(p) {
+    var bar = document.getElementById('bar');
+    var fill = document.getElementById('barFill');
     if (p == null) {
-      bar.classList.remove('show');
+      bar.classList.remove('on');
       fill.style.width = '0%';
       return;
     }
-    bar.classList.add('show');
-    fill.style.width = Math.max(0, Math.min(100, p)) + '%';
+    bar.classList.add('on');
+    fill.style.width = Math.round(Math.min(100, Math.max(0, p))) + '%';
   }
 
-  function preprocessImage(file) {
-    return new Promise(function (resolve, reject) {
+  function render() {
+    var panel = document.getElementById('panel');
+    var list = document.getElementById('list');
+    if (!rows.length) {
+      panel.classList.remove('on');
+      return;
+    }
+    panel.classList.add('on');
+    var a = avg();
+    document.getElementById('avg').textContent = a.toFixed(1);
+    document.getElementById('letter').textContent = letter(a);
+
+    var html = '';
+    rows.forEach(function (r) {
+      if (r.isTotal) {
+        html +=
+          '<div class="row total"><div class="name">' +
+          esc(r.item) +
+          '</div><div class="meta">' +
+          (r.category ? esc(r.category) + ' · ' : '') +
+          r.weight.toFixed(0) +
+          '%</div></div>';
+        return;
+      }
+      var has = r.value != null;
+      html +=
+        '<div class="row">' +
+        '<div class="name">' +
+        esc(r.item) +
+        '</div>' +
+        '<div class="meta">' +
+        (r.category ? esc(r.category) + ' · ' : '') +
+        'Weight ' +
+        r.weight.toFixed(1) +
+        '%</div>' +
+        '<button type="button" class="tap' +
+        (has ? '' : ' empty') +
+        '" data-id="' +
+        r.id +
+        '">' +
+        (has ? fmt(r.value) : 'Nhập') +
+        '</button></div>';
+    });
+    list.innerHTML = html;
+  }
+
+  function prepImage(file) {
+    return new Promise(function (resolve) {
       var url = URL.createObjectURL(file);
       var img = new Image();
       img.onload = function () {
         try {
-          var maxW = 1600;
-          var scale = img.width > maxW ? maxW / img.width : 1;
-          // upscale small images for OCR
-          if (img.width < 900) scale = Math.min(2, 1100 / img.width);
+          var maxW = 1400;
+          var scale = img.width > maxW ? maxW / img.width : img.width < 800 ? Math.min(2, 1000 / img.width) : 1;
           var w = Math.round(img.width * scale);
           var h = Math.round(img.height * scale);
-          var canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          var ctx = canvas.getContext('2d');
+          var c = document.createElement('canvas');
+          c.width = w;
+          c.height = h;
+          var ctx = c.getContext('2d');
           ctx.fillStyle = '#fff';
           ctx.fillRect(0, 0, w, h);
           ctx.drawImage(img, 0, 0, w, h);
@@ -800,160 +645,121 @@
           var d = id.data;
           for (var i = 0; i < d.length; i += 4) {
             var g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-            // contrast
-            g = (g - 128) * 1.35 + 128;
+            g = (g - 128) * 1.3 + 128;
             if (g < 0) g = 0;
             if (g > 255) g = 255;
-            // mild threshold-ish
             d[i] = d[i + 1] = d[i + 2] = g;
           }
           ctx.putImageData(id, 0, 0);
           URL.revokeObjectURL(url);
-          canvas.toBlob(
-            function (blob) {
-              if (!blob) reject(new Error('canvas blob failed'));
-              else resolve(blob);
-            },
-            'image/png',
-            0.95
-          );
+          c.toBlob(function (b) {
+            resolve(b || file);
+          }, 'image/png');
         } catch (e) {
           URL.revokeObjectURL(url);
-          reject(e);
+          resolve(file);
         }
       };
       img.onerror = function () {
         URL.revokeObjectURL(url);
-        reject(new Error('Không đọc được ảnh'));
+        resolve(file);
       };
       img.src = url;
     });
   }
 
   async function runOcr(file) {
+    var btn = document.getElementById('btnPick');
+    btn.disabled = true;
+    var thumb = document.getElementById('thumb');
+    thumb.src = URL.createObjectURL(file);
+    thumb.classList.add('on');
+    setStatus('Đang đọc ảnh…', 'wait');
+    setBar(8);
+
     if (!window.Tesseract) {
-      setStatus('Chưa load được Tesseract.js — kiểm tra mạng.', 'err');
+      setStatus('Không tải được OCR. Cần mạng lần đầu.', 'err');
+      btn.disabled = false;
+      setBar(null);
       return;
     }
-    lastFile = file;
-    var preview = document.getElementById('previewImg');
-    var wrap = document.getElementById('previewWrap');
-    preview.src = URL.createObjectURL(file);
-    wrap.classList.add('show');
 
-    setStatus('Đang xử lý ảnh…');
-    setProgress(5);
-
-    var blob;
-    try {
-      blob = await preprocessImage(file);
-    } catch (e) {
-      blob = file;
-    }
-
-    setStatus('OCR đang đọc chữ (lần đầu có thể tải model ~1 phút)…');
+    var blob = await prepImage(file);
     try {
       var result = await Tesseract.recognize(blob, 'eng', {
         logger: function (m) {
           if (m.status === 'recognizing text' && m.progress != null) {
-            setProgress(10 + m.progress * 85);
-            setStatus('OCR… ' + Math.round(m.progress * 100) + '%');
-          } else if (m.status) {
-            setStatus(m.status + '…');
+            setBar(10 + m.progress * 85);
+            setStatus('Đang đọc… ' + Math.round(m.progress * 100) + '%', 'wait');
           }
         },
       });
       var text = (result && result.data && result.data.text) || '';
-      document.getElementById('rawBox').textContent = text;
-      document.getElementById('rawToggle').classList.add('show');
-
-      var parsed = parseMarkDetailsText(text);
+      var parsed = parseText(text);
       if (!parsed.length) {
-        setProgress(100);
-        setStatus(
-          'Không nhận ra dòng weight (vd 10.0 %). Thử crop sát bảng, chụp rõ hơn, đủ cột Weight.',
-          'err'
-        );
+        setStatus('Chưa đọc được bảng. Thử ảnh rõ hơn, đủ cột Weight (10.0 %).', 'err');
+        setBar(null);
+        btn.disabled = false;
         return;
       }
-
       rows = parsed;
-      setProgress(100);
-      setStatus(
-        'OK — nhận ' +
-          parsed.length +
-          ' dòng (' +
-          scorable().length +
-          ' thành phần có thể nhập điểm). Chạm Value để sửa.',
-        'ok'
-      );
+      setBar(100);
+      setStatus('Xong — ' + scorable().length + ' thành phần. Chạm 「Nhập」 để gõ điểm.', 'ok');
       render();
-      document.getElementById('tableSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (err) {
-      console.error(err);
-      setStatus('OCR lỗi: ' + (err && err.message ? err.message : String(err)), 'err');
-      setProgress(null);
+      document.getElementById('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {
+      console.error(e);
+      setStatus('Lỗi OCR. Thử ảnh khác.', 'err');
+      setBar(null);
     }
+    btn.disabled = false;
   }
 
-  function onFiles(fileList) {
-    var f = fileList && fileList[0];
-    if (!f) return;
-    if (!/^image\//.test(f.type) && !/\.(png|jpe?g|webp|heic)$/i.test(f.name || '')) {
-      setStatus('Chọn file ảnh (PNG/JPG).', 'err');
-      return;
+  /* ---- wheel ---- */
+  function buildCol(el, max) {
+    var h = '<div class="pad"></div>';
+    for (var i = 0; i <= max; i++) h += '<div class="it" data-v="' + i + '">' + i + '</div>';
+    h += '<div class="pad"></div>';
+    el.innerHTML = h;
+  }
+  function scrollTo(el, v, smooth) {
+    var it = el.querySelector('.it[data-v="' + v + '"]');
+    if (!it) return;
+    var top = it.offsetTop - (el.clientHeight - it.clientHeight) / 2;
+    el.scrollTo({ top: top, behavior: smooth ? 'smooth' : 'auto' });
+  }
+  function readCol(el) {
+    var items = el.querySelectorAll('.it');
+    var mid = el.scrollTop + el.clientHeight / 2;
+    var best = 0, dist = 1e9;
+    for (var i = 0; i < items.length; i++) {
+      var c = items[i].offsetTop + items[i].clientHeight / 2;
+      var d = Math.abs(c - mid);
+      if (d < dist) {
+        dist = d;
+        best = parseInt(items[i].getAttribute('data-v'), 10);
+      }
     }
-    runOcr(f);
+    return best;
   }
-
-  // ---------- Wheel ----------
-  function buildWheel(el, max) {
-    el.innerHTML = '';
-    var pad = document.createElement('div');
-    pad.className = 'empty-pad';
-    el.appendChild(pad);
-    for (var i = 0; i <= max; i++) {
-      var d = document.createElement('div');
-      d.className = 'wheel-item';
-      d.textContent = String(i);
-      d.dataset.v = String(i);
-      el.appendChild(d);
-    }
-    var pad2 = document.createElement('div');
-    pad2.className = 'empty-pad';
-    el.appendChild(pad2);
-  }
-  function scrollToValue(el, value, smooth) {
-    el.scrollTo({ top: value * ITEM_H, behavior: smooth ? 'smooth' : 'auto' });
-  }
-  function readWheel(el) {
-    var idx = Math.round(el.scrollTop / ITEM_H);
-    var max = el.querySelectorAll('.wheel-item').length - 1;
-    if (idx < 0) idx = 0;
-    if (idx > max) idx = max;
-    return idx;
-  }
-  function syncPreview() {
-    var i = readWheel(document.getElementById('wheelInt'));
-    var d = readWheel(document.getElementById('wheelDec'));
-    if (i >= 10) {
-      i = 10;
-      d = 0;
-    }
+  function preview() {
+    var i = readCol(document.getElementById('wInt'));
+    var d = readCol(document.getElementById('wDec'));
+    if (i >= 10) d = 0;
     var v = i >= 10 ? 10 : i + d / 10;
-    document.getElementById('sheetPreview').textContent = v.toFixed(1);
+    document.getElementById('sheetBig').textContent = v.toFixed(1);
   }
-  function openPicker(id) {
+  function openPick(id) {
     var row = null;
     for (var i = 0; i < rows.length; i++) if (rows[i].id === id) row = rows[i];
     if (!row || row.isTotal) return;
     editId = id;
     document.getElementById('sheetSub').textContent =
-      (row.category ? row.category + ' · ' : '') + row.item + ' · ' + row.weight + '%';
-    var wi = document.getElementById('wheelInt');
-    var wd = document.getElementById('wheelDec');
-    buildWheel(wi, 10);
-    buildWheel(wd, 9);
+      row.item + ' · ' + row.weight + '%';
+    var wi = document.getElementById('wInt');
+    var wd = document.getElementById('wDec');
+    buildCol(wi, 10);
+    buildCol(wd, 9);
     var v = row.value != null ? row.value : 0;
     var ip = Math.min(10, Math.floor(v + 1e-9));
     var dp = Math.round((v - ip) * 10);
@@ -961,228 +767,83 @@
       ip = 10;
       dp = 0;
     }
-    var ov = document.getElementById('overlay');
-    var sh = document.getElementById('sheet');
-    ov.hidden = false;
-    sh.hidden = false;
+    document.getElementById('mask').classList.add('on');
+    document.getElementById('sheet').classList.add('on');
     requestAnimationFrame(function () {
-      ov.classList.add('open');
-      sh.classList.add('open');
-      scrollToValue(wi, ip, false);
-      scrollToValue(wd, dp, false);
-      syncPreview();
+      scrollTo(wi, ip, false);
+      scrollTo(wd, dp, false);
+      preview();
     });
   }
-  function closePicker() {
-    var ov = document.getElementById('overlay');
-    var sh = document.getElementById('sheet');
-    ov.classList.remove('open');
-    sh.classList.remove('open');
-    setTimeout(function () {
-      ov.hidden = true;
-      sh.hidden = true;
-      editId = null;
-    }, 250);
+  function closePick() {
+    document.getElementById('mask').classList.remove('on');
+    document.getElementById('sheet').classList.remove('on');
+    editId = null;
   }
-  function applyPicker(clear) {
+  function apply(clear) {
     if (!editId) return;
     var row = null;
     for (var i = 0; i < rows.length; i++) if (rows[i].id === editId) row = rows[i];
     if (!row) return;
     if (clear) row.value = null;
     else {
-      var i = readWheel(document.getElementById('wheelInt'));
-      var d = readWheel(document.getElementById('wheelDec'));
-      row.value = i >= 10 ? 10 : clampScore(i + d / 10);
+      var i = readCol(document.getElementById('wInt'));
+      var d = readCol(document.getElementById('wDec'));
+      row.value = i >= 10 ? 10 : clamp(i + d / 10);
     }
-    closePicker();
+    closePick();
     render();
   }
 
-  // ---------- Camera (getUserMedia) + gallery ----------
-  var camStream = null;
-  var camFacing = 'environment';
-
-  function stopCamera() {
-    if (camStream) {
-      camStream.getTracks().forEach(function (t) {
-        t.stop();
-      });
-      camStream = null;
-    }
-    var v = document.getElementById('camVideo');
-    if (v) v.srcObject = null;
-    var ov = document.getElementById('camOverlay');
-    ov.classList.remove('open');
-    ov.setAttribute('aria-hidden', 'true');
-  }
-
-  async function startCamera() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      // Fallback: OS file picker with capture (may still open gallery on some browsers)
-      setStatus('Trình duyệt không hỗ trợ camera trực tiếp — mở bộ chọn ảnh (chọn Camera nếu có).');
-      document.getElementById('fileCamera').click();
-      return;
-    }
-    stopCamera();
-    var ov = document.getElementById('camOverlay');
-    var video = document.getElementById('camVideo');
-    document.getElementById('camShutter').disabled = true;
-    setStatus('Đang mở camera…');
-    try {
-      camStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          facingMode: { ideal: camFacing },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-      });
-      video.srcObject = camStream;
-      await video.play();
-      ov.classList.add('open');
-      ov.setAttribute('aria-hidden', 'false');
-      document.getElementById('camShutter').disabled = false;
-      setStatus('Camera sẵn sàng — canh bảng điểm rồi bấm nút tròn.');
-    } catch (err) {
-      console.warn(err);
-      setStatus(
-        'Không mở được camera (' +
-          (err && err.name ? err.name : 'error') +
-          '). Thử cấp quyền Camera, hoặc dùng Thư viện / bộ chọn hệ thống.',
-        'err'
-      );
-      // fallback OS camera intent
-      try {
-        document.getElementById('fileCamera').click();
-      } catch (e2) {}
-    }
-  }
-
-  function captureFromCamera() {
-    var video = document.getElementById('camVideo');
-    if (!video || !video.videoWidth) {
-      setStatus('Camera chưa sẵn sàng.', 'err');
-      return;
-    }
-    var canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    var ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-    stopCamera();
-    canvas.toBlob(
-      function (blob) {
-        if (!blob) {
-          setStatus('Không chụp được frame.', 'err');
-          return;
-        }
-        var file = new File([blob], 'fap-capture-' + Date.now() + '.jpg', {
-          type: 'image/jpeg',
-        });
-        runOcr(file);
-      },
-      'image/jpeg',
-      0.92
-    );
-  }
-
-  document.getElementById('btnCamera').addEventListener('click', function () {
-    startCamera();
+  /* events — one button */
+  document.getElementById('btnPick').addEventListener('click', function () {
+    document.getElementById('file').click();
   });
-  document.getElementById('btnGallery').addEventListener('click', function () {
-    document.getElementById('fileGallery').click();
-  });
-  document.getElementById('camClose').addEventListener('click', function () {
-    stopCamera();
-    setStatus('Đã đóng camera.');
-  });
-  document.getElementById('camShutter').addEventListener('click', captureFromCamera);
-  document.getElementById('camFlip').addEventListener('click', function () {
-    camFacing = camFacing === 'environment' ? 'user' : 'environment';
-    startCamera();
-  });
-
-  document.getElementById('fileCamera').addEventListener('change', function (e) {
-    onFiles(e.target.files);
+  document.getElementById('file').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
     e.target.value = '';
+    if (f) runOcr(f);
   });
-  document.getElementById('fileGallery').addEventListener('change', function (e) {
-    onFiles(e.target.files);
-    e.target.value = '';
+  document.getElementById('btnAgain').addEventListener('click', function () {
+    document.getElementById('file').click();
   });
-
-  var card = document.getElementById('ocrCard');
-  card.addEventListener('dragover', function (e) {
-    e.preventDefault();
-    card.classList.add('drag');
-  });
-  card.addEventListener('dragleave', function () {
-    card.classList.remove('drag');
-  });
-  card.addEventListener('drop', function (e) {
-    e.preventDefault();
-    card.classList.remove('drag');
-    onFiles(e.dataTransfer.files);
-  });
-
-  document.getElementById('rawToggle').addEventListener('click', function () {
-    document.getElementById('rawBox').classList.toggle('show');
-  });
-
-  document.getElementById('marksBody').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-edit]');
-    if (b) openPicker(b.getAttribute('data-edit'));
-  });
-
-  document.getElementById('btnClearVals').addEventListener('click', function () {
+  document.getElementById('btnClear').addEventListener('click', function () {
     rows.forEach(function (r) {
       if (!r.isTotal) r.value = null;
     });
     render();
   });
-  document.getElementById('btnReocr').addEventListener('click', function () {
-    document.getElementById('fileGallery').click();
+  document.getElementById('list').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-id]');
+    if (b) openPick(b.getAttribute('data-id'));
+  });
+  document.getElementById('mask').addEventListener('click', closePick);
+  document.getElementById('btnOk').addEventListener('click', function () {
+    apply(false);
+  });
+  document.getElementById('btnEmpty').addEventListener('click', function () {
+    apply(true);
   });
 
-  document.getElementById('overlay').addEventListener('click', closePicker);
-  document.getElementById('sheetCancel').addEventListener('click', closePicker);
-  document.getElementById('sheetDone').addEventListener('click', function () {
-    applyPicker(false);
-  });
-  document.getElementById('sheetOk').addEventListener('click', function () {
-    applyPicker(false);
-  });
-  document.getElementById('sheetClear').addEventListener('click', function () {
-    applyPicker(true);
-  });
-
-  function onWheelScroll(el, key) {
-    if (snapTimers[key]) clearTimeout(snapTimers[key]);
-    snapTimers[key] = setTimeout(function () {
-      var idx = readWheel(el);
-      scrollToValue(el, idx, true);
-      if (key === 'int' && idx >= 10) scrollToValue(document.getElementById('wheelDec'), 0, true);
-      syncPreview();
-    }, 80);
-    syncPreview();
+  function bindScroll(el, key) {
+    el.addEventListener(
+      'scroll',
+      function () {
+        preview();
+        clearTimeout(timers[key]);
+        timers[key] = setTimeout(function () {
+          var v = readCol(el);
+          scrollTo(el, v, true);
+          if (key === 'i' && v >= 10) scrollTo(document.getElementById('wDec'), 0, true);
+          preview();
+        }, 90);
+      },
+      { passive: true }
+    );
   }
-  document.getElementById('wheelInt').addEventListener(
-    'scroll',
-    function () {
-      onWheelScroll(document.getElementById('wheelInt'), 'int');
-    },
-    { passive: true }
-  );
-  document.getElementById('wheelDec').addEventListener(
-    'scroll',
-    function () {
-      onWheelScroll(document.getElementById('wheelDec'), 'dec');
-    },
-    { passive: true }
-  );
+  bindScroll(document.getElementById('wInt'), 'i');
+  bindScroll(document.getElementById('wDec'), 'd');
 
-  // Paste image from clipboard (desktop)
   document.addEventListener('paste', function (e) {
     var items = e.clipboardData && e.clipboardData.items;
     if (!items) return;
